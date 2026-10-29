@@ -1,0 +1,58 @@
+services:
+  postgres-transport:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - transport_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [transport_lab]
+
+  keycloak-transport:
+    image: quay.io/keycloak/keycloak:26.4.2
+    command: ["start-dev", "--http-port=8080"]
+    restart: unless-stopped
+    depends_on:
+      postgres-transport:
+        condition: service_healthy
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres-transport:5432/${POSTGRES_DB}
+      KC_DB_USERNAME: ${POSTGRES_USER}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "127.0.0.1:${TRANSPORT_KC_HTTP_PORT:-8180}:8080"
+    networks: [transport_lab]
+
+  driver-api:
+    build:
+      context: ./driver_wallet_api
+    restart: unless-stopped
+    depends_on:
+      - keycloak-transport
+    environment:
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER}
+      KEYCLOAK_BROWSER_ISSUER: ${KEYCLOAK_BROWSER_ISSUER}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      EXPECTED_AUDIENCE: ${EXPECTED_AUDIENCE}
+    ports:
+      - "127.0.0.1:${TRANSPORT_API_PORT:-5001}:5001"
+    networks: [transport_lab]
+
+networks:
+  transport_lab:
+    internal: true
+
+volumes:
+  transport_postgres_data:
