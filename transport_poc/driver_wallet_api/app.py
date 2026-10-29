@@ -8,7 +8,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 
 
 def create_app(test_config=None):
@@ -106,7 +106,26 @@ def create_app(test_config=None):
             client_secret_configured=bool(app.config["OIDC_CLIENT_SECRET"]),
             note="Configuration presence only; not evidence of live Keycloak connectivity or security efficacy.",
         )
+@app.get("/")
+def driver_app():
+    return render_template("index.html")
 
+REGISTERED_AUTHENTICATORS = {"U-001": ["AUTH-001-PRIMARY"]}
+PENDING_ENROLLMENT_REQUESTS = {}
+
+@app.post("/api/driver/enroll-authenticator")
+def enroll_authenticator():
+    token_data, failure = authorized_subject()
+    if failure:
+        return failure
+    driver_id = token_data.get("preferred_username", "unknown")
+    request_body = request.get_json() or {}
+    new_auth_id = request_body.get("authenticator_id", "UNKNOWN")
+    existing = REGISTERED_AUTHENTICATORS.get(driver_id, [])
+    if new_auth_id not in existing:
+        PENDING_ENROLLMENT_REQUESTS[driver_id] = {"attempted_id": new_auth_id, "status": "BLOCKED"}
+        return jsonify(status="denied", error="unauthorized_enrollment_blocked", message="يتطلب موافقة خارج النطاق"), 403
+    return jsonify(status="success"), 200
     return app
 
 
