@@ -1,0 +1,23 @@
+[
+  {
+    "driver_id": "DRV-SYN-001",
+    "display_name": "Synthetic Driver Alpha",
+    "account_status": "ACTIVE",
+    "risk_profile": "STANDARD",
+    "data_classification": "SYNTHETIC"
+  },
+  {
+    "driver_id": "DRV-SYN-002",
+    "display_name": "Synthetic Driver Beta",
+    "account_status": "SUSPENDED",
+    "risk_profile": "ELEVATED",
+    "data_classification": "SYNTHETIC"
+  },
+  {
+    "driver_id": "DRV-SYN-003",
+    "display_name": "Synthetic Driver Gamma",
+    "account_status": "ACTIVE",
+    "risk_profile": "HIGH",
+    "data_classification": "SYNTHETIC"
+  }
+]

@@ -3,9 +3,9 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in env.transport}
-      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in env.transport}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in env.transport}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - transport_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -13,11 +13,12 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-    networks: [transport_lab]
+    networks:
+      - transport_lab
 
   keycloak-transport:
     image: quay.io/keycloak/keycloak:26.4.2
-    command: ["start-dev", "--http-port=8080"]
+    command: ["start-dev", "--http-port=8080", "--health-enabled=true"]
     restart: unless-stopped
     depends_on:
       postgres-transport:
@@ -27,12 +28,19 @@ services:
       KC_DB_URL: jdbc:postgresql://postgres-transport:5432/${POSTGRES_DB}
       KC_DB_USERNAME: ${POSTGRES_USER}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:?Set KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?Set KC_BOOTSTRAP_ADMIN_PASSWORD}
       KC_HEALTH_ENABLED: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec \"echo > /dev/tcp/127.0.0.1/9000\""]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
     ports:
-      - "127.0.0.1:${TRANSPORT_KC_HTTP_PORT:-8180}:8080"
-    networks: [transport_lab]
+      - "127.0.0.1:${KEYCLOAK_HOST_PORT:-8080}:8080"
+    networks:
+      - transport_lab
 
   driver-api:
     build:
@@ -40,16 +48,18 @@ services:
     restart: unless-stopped
     depends_on:
       keycloak-transport:
-        condition: service_started
+        condition: service_healthy
     environment:
-      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER}
-      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
-      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
-      EXPECTED_AUDIENCE: ${EXPECTED_AUDIENCE}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://keycloak-transport:8080/realms/sanad-lab}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?Set OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?Set OIDC_CLIENT_SECRET}
+      EXPECTED_AUDIENCE: ${EXPECTED_AUDIENCE:-driver-wallet-api}
+      REQUIRED_WALLET_SCOPE: ${REQUIRED_WALLET_SCOPE:-wallet:read}
       HTTP_TIMEOUT_SECONDS: ${HTTP_TIMEOUT_SECONDS:-3}
     ports:
       - "127.0.0.1:${TRANSPORT_API_PORT:-5001}:5001"
-    networks: [transport_lab]
+    networks:
+      - transport_lab
 
 networks:
   transport_lab:

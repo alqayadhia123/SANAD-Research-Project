@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+!.env.transport.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.coverage
+htmlcov/
+*.log
+experiments/raw/*
+!experiments/raw/.gitkeep

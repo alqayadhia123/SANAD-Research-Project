@@ -1,0 +1,26 @@
+[
+  {
+    "route_id": "RTE-SYN-001",
+    "driver_id": "DRV-SYN-001",
+    "origin_label": "Synthetic Zone North",
+    "destination_label": "Synthetic Zone Central",
+    "route_status": "COMPLETED",
+    "data_classification": "SYNTHETIC"
+  },
+  {
+    "route_id": "RTE-SYN-002",
+    "driver_id": "DRV-SYN-002",
+    "origin_label": "Synthetic Zone East",
+    "destination_label": "Synthetic Zone West",
+    "route_status": "CANCELLED",
+    "data_classification": "SYNTHETIC"
+  },
+  {
+    "route_id": "RTE-SYN-003",
+    "driver_id": "DRV-SYN-003",
+    "origin_label": "Synthetic Zone South",
+    "destination_label": "Synthetic Zone Central",
+    "route_status": "ACTIVE",
+    "data_classification": "SYNTHETIC"
+  }
+]

@@ -1,0 +1,235 @@
+name: SANAD live integration validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "transport_poc/**"
+      - ".github/workflows/sanad-live-integration.yml"
+  push:
+    branches: [fix/sanad-p0-security-baseline]
+    paths:
+      - "transport_poc/**"
+      - ".github/workflows/sanad-live-integration.yml"
+
+concurrency:
+  group: sanad-live-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  live-keycloak-postgres-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare isolated integration environment
+        shell: bash
+        run: |
+          cat > transport_poc/.env <<'EOF'
+          POSTGRES_DB=sanad_ci
+          POSTGRES_USER=sanad_ci
+          POSTGRES_PASSWORD=ci-only-postgres-password
+          KC_BOOTSTRAP_ADMIN_USERNAME=admin
+          KC_BOOTSTRAP_ADMIN_PASSWORD=ci-only-keycloak-password
+          KEYCLOAK_HOST_PORT=18080
+          TRANSPORT_API_PORT=15001
+          KEYCLOAK_ISSUER=http://keycloak-transport:8080/realms/sanad-lab
+          OIDC_CLIENT_ID=driver-wallet-api
+          OIDC_CLIENT_SECRET=ci-only-client-secret
+          EXPECTED_AUDIENCE=driver-wallet-api
+          REQUIRED_WALLET_SCOPE=wallet:read
+          HTTP_TIMEOUT_SECONDS=5
+          EOF
+
+      - name: Start PostgreSQL, Keycloak, and SANAD API
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=20s 300s \
+            docker compose --env-file transport_poc/.env \
+            -f transport_poc/docker-compose.transport.yaml up --build -d
+          docker compose --env-file transport_poc/.env \
+            -f transport_poc/docker-compose.transport.yaml ps --all
+
+      - name: Wait for Keycloak OIDC discovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The Compose network is intentionally internal. Probe Keycloak from
+          # the API container on that network instead of relying on host-published
+          # ports, which are not reachable in this isolated runner topology.
+          docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml exec -T driver-api python - <<'PY'
+          import json
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import urlopen
+
+          url = "http://keycloak-transport:8080/realms/master/.well-known/openid-configuration"
+          last_error = "no response"
+          for attempt in range(1, 61):
+              try:
+                  with urlopen(url, timeout=3) as response:
+                      if response.status != 200:
+                          raise RuntimeError(f"HTTP {response.status}")
+                      metadata = json.loads(response.read(1024 * 1024))
+                  required = ("issuer", "token_endpoint", "token_introspection_endpoint")
+                  if not all(isinstance(metadata.get(key), str) and metadata[key] for key in required):
+                      raise RuntimeError("OIDC discovery metadata is missing required fields")
+                  print(f"Keycloak OIDC discovery ready over Compose network (attempt {attempt})")
+                  break
+              except (HTTPError, URLError, TimeoutError, OSError, ValueError, RuntimeError) as exc:
+                  last_error = str(exc)
+                  if attempt % 12 == 0:
+                      print(f"OIDC discovery not ready (attempt {attempt}/60): {last_error}")
+                  time.sleep(5)
+          else:
+              raise SystemExit(f"Keycloak OIDC discovery did not become ready: {last_error}")
+          PY
+
+      - name: Configure disposable realm, confidential service client, and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml exec -T keycloak-transport bash -ec '
+            kcadm.sh config credentials --server http://localhost:8080 --realm master --user "$KC_BOOTSTRAP_ADMIN_USERNAME" --password "$KC_BOOTSTRAP_ADMIN_PASSWORD"
+            kcadm.sh create realms -s realm=sanad-lab -s enabled=true
+            CLIENT_ID=$(kcadm.sh create clients -r sanad-lab -i \
+              -s clientId=driver-wallet-api \
+              -s enabled=true \
+              -s protocol=openid-connect \
+              -s publicClient=false \
+              -s clientAuthenticatorType=client-secret \
+              -s secret=ci-only-client-secret \
+              -s directAccessGrantsEnabled=false \\
+              -s serviceAccountsEnabled=true)
+            kcadm.sh create "clients/$CLIENT_ID/protocol-mappers/models" -r sanad-lab \
+              -s name=sanad-api-audience \
+              -s protocol=openid-connect \
+              -s protocolMapper=oidc-audience-mapper \
+              -s "config.included.client.audience=driver-wallet-api" \
+              -s "config.access.token.claim=true" \
+              -s "config.id.token.claim=false"
+            SCOPE_ID=$(kcadm.sh create client-scopes -r sanad-lab -i \
+              -s name=wallet:read -s protocol=openid-connect \
+              -s 'attributes."display.on.consent.screen"=false')
+            kcadm.sh create "client-scopes/$SCOPE_ID/protocol-mappers/models" -r sanad-lab \
+              -s name=sanad-wallet-scope \
+              -s protocol=openid-connect \
+              -s protocolMapper=oidc-hardcoded-claim-mapper \
+              -s "config.claim.name=scope" \
+              -s "config.claim.value=wallet:read" \
+              -s "config.jsonType.label=String" \
+              -s "config.access.token.claim=true" \
+              -s "config.id.token.claim=false"
+            kcadm.sh update "clients/$CLIENT_ID/optional-client-scopes/$SCOPE_ID" -r sanad-lab
+          '
+
+      - name: Wait for SANAD API
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml exec -T driver-api python - <<'PY'
+          import time
+          from urllib.request import urlopen
+
+          for attempt in range(1, 31):
+              try:
+                  with urlopen("http://127.0.0.1:5001/health", timeout=2) as response:
+                      if response.status == 200:
+                          print(f"SANAD API health check passed (attempt {attempt})")
+                          break
+              except Exception:
+                  time.sleep(2)
+          else:
+              raise SystemExit("SANAD API health check did not become ready")
+          PY
+
+      - name: Verify real token introspection and authorization decisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml exec -T driver-api python - <<'PY'
+          import json
+          from urllib.error import HTTPError
+          from urllib.parse import urlencode
+          from urllib.request import Request, urlopen
+
+          base = "http://127.0.0.1:5001"
+          token_url = "http://keycloak-transport:8080/realms/sanad-lab/protocol/openid-connect/token"
+          client_id = "driver-wallet-api"
+          client_secret = "ci-only-client-secret"
+
+          def issue_token(scope=None):
+              fields = {
+                  "grant_type": "client_credentials",
+                  "client_id": client_id,
+                  "client_secret": client_secret,
+              }
+              if scope:
+                  fields["scope"] = scope
+              request = Request(token_url, data=urlencode(fields).encode(), method="POST")
+              with urlopen(request, timeout=8) as response:
+                  return json.loads(response.read())["access_token"]
+
+          def api_status(token=None):
+              headers = {}
+              if token is not None:
+                  headers["Authorization"] = f"Bearer {token}"
+              request = Request(f"{base}/api/driver/wallet", headers=headers)
+              try:
+                  with urlopen(request, timeout=8) as response:
+                      return response.status, json.loads(response.read())
+              except HTTPError as exc:
+                  return exc.code, json.loads(exc.read() or b"{}")
+
+          no_scope_token = issue_token()
+          valid_token = issue_token("openid wallet:read")
+
+          missing_status, _ = api_status()
+          assert missing_status == 401, f"missing token expected 401, got {missing_status}"
+
+          denied_status, _ = api_status(no_scope_token)
+          assert denied_status == 403, f"insufficient scope expected 403, got {denied_status}"
+
+          valid_status, valid_body = api_status(valid_token)
+          assert valid_status == 200, f"valid token expected 200, got {valid_status}"
+          assert valid_body.get("synthetic_data") is True
+          assert valid_body.get("status") == "success"
+
+          invalid_status, _ = api_status("definitely-not-a-real-token")
+          assert invalid_status == 401, f"invalid token expected 401, got {invalid_status}"
+
+          print("Live Keycloak introspection integration passed: missing=401 insufficient_scope=403 valid=200 invalid=401")
+          PY
+
+      - name: Collect service diagnostics
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          COMPOSE=(docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml)
+          echo "===== COMPOSE STATUS ====="
+          "${COMPOSE[@]}" ps --all
+          echo "===== CONTAINER HEALTH ====="
+          IDS=$("${COMPOSE[@]}" ps -aq)
+          if [ -n "$IDS" ]; then
+            docker inspect --format '{{.Name}} state={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} exit={{.State.ExitCode}}' $IDS
+          else
+            echo "No Compose containers were created."
+          fi
+          echo "===== SERVICE LOGS (last 250 lines) ====="
+          "${COMPOSE[@]}" logs --no-color --tail=250
+          exit 0
+
+      - name: Stop services and remove CI volumes
+        if: always()
+        run: docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml down --volumes --remove-orphans
+
+      - name: Remove temporary environment file
+        if: always()
+        run: rm -f transport_poc/.env

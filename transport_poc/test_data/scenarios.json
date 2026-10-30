@@ -1,0 +1,79 @@
+[
+  {
+    "scenario_id": "SCN-AUTH-001",
+    "title": "Valid token with expected issuer, audience, and scope",
+    "category": "AUTHORIZATION",
+    "driver_id": "DRV-SYN-001",
+    "expected_http_status": 200,
+    "status": "NOT_RUN",
+    "evidence_ref": null,
+    "executed_at": null,
+    "tested_commit_sha": null
+  },
+  {
+    "scenario_id": "SCN-AUTH-002",
+    "title": "Inactive or expired access token",
+    "category": "TOKEN_VALIDATION",
+    "driver_id": "DRV-SYN-001",
+    "expected_http_status": 401,
+    "status": "NOT_RUN",
+    "evidence_ref": null,
+    "executed_at": null,
+    "tested_commit_sha": null
+  },
+  {
+    "scenario_id": "SCN-AUTH-003",
+    "title": "Audience mismatch",
+    "category": "TOKEN_VALIDATION",
+    "driver_id": "DRV-SYN-001",
+    "expected_http_status": 401,
+    "status": "NOT_RUN",
+    "evidence_ref": null,
+    "executed_at": null,
+    "tested_commit_sha": null
+  },
+  {
+    "scenario_id": "SCN-AUTH-004",
+    "title": "Missing required wallet scope",
+    "category": "AUTHORIZATION",
+    "driver_id": "DRV-SYN-001",
+    "expected_http_status": 403,
+    "status": "NOT_RUN",
+    "evidence_ref": null,
+    "executed_at": null,
+    "tested_commit_sha": null
+  },
+  {
+    "scenario_id": "SCN-SESS-001",
+    "title": "Revoked session reflected by identity provider introspection",
+    "category": "SESSION_REVOCATION",
+    "driver_id": "DRV-SYN-002",
+    "expected_http_status": 401,
+    "status": "NOT_RUN",
+    "evidence_ref": null,
+    "executed_at": null,
+    "tested_commit_sha": null
+  },
+  {
+    "scenario_id": "SCN-WA-001",
+    "title": "Authenticator enrollment endpoint remains unavailable until implemented",
+    "category": "WEBAUTHN",
+    "driver_id": "DRV-SYN-003",
+    "expected_http_status": 501,
+    "status": "NOT_RUN",
+    "evidence_ref": null,
+    "executed_at": null,
+    "tested_commit_sha": null
+  },
+  {
+    "scenario_id": "SCN-REPLAY-001",
+    "title": "Replay of consumed WebAuthn assertion",
+    "category": "REPLAY_RESISTANCE",
+    "driver_id": "DRV-SYN-003",
+    "expected_http_status": null,
+    "status": "BLOCKED",
+    "evidence_ref": null,
+    "executed_at": null,
+    "tested_commit_sha": null
+  }
+]

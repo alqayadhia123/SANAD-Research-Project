@@ -1,0 +1,69 @@
+name: SANAD container validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "transport_poc/driver_wallet_api/**"
+      - "transport_poc/docker-compose.transport.yaml"
+      - ".github/workflows/sanad-container-validation.yml"
+  push:
+    branches:
+      - "fix/sanad-p0-security-baseline"
+    paths:
+      - "transport_poc/driver_wallet_api/**"
+      - "transport_poc/docker-compose.transport.yaml"
+      - ".github/workflows/sanad-container-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  compose-config-and-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare non-production validation environment
+        run: |
+          cat > transport_poc/.env <<'EOF'
+          POSTGRES_DB=sanad_validation
+          POSTGRES_USER=sanad_validation
+          POSTGRES_PASSWORD=validation-only-not-a-secret
+          KC_BOOTSTRAP_ADMIN_USERNAME=validation-admin
+          KC_BOOTSTRAP_ADMIN_PASSWORD=validation-only-not-a-secret
+          OIDC_CLIENT_ID=driver-wallet-api
+          OIDC_CLIENT_SECRET=validation-only-not-a-secret
+          EXPECTED_AUDIENCE=driver-wallet-api
+          EOF
+
+      - name: Validate Compose configuration
+        run: docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml config --quiet
+
+      - name: Build API image
+        run: docker build --tag sanad-driver-api:ci transport_poc/driver_wallet_api
+
+      - name: Start API container for health smoke test
+        run: |
+          docker run --detach --name sanad-driver-api-ci \
+            --publish 127.0.0.1:15001:5001 \
+            --env OIDC_CLIENT_ID=driver-wallet-api \
+            --env OIDC_CLIENT_SECRET=validation-only-not-a-secret \
+            --env KEYCLOAK_ISSUER=http://127.0.0.1:18080/realms/sanad-lab \
+            sanad-driver-api:ci
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:15001/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs sanad-driver-api-ci
+          exit 1
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm --force sanad-driver-api-ci || true
+          rm -f transport_poc/.env

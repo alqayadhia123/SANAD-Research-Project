@@ -1,17 +1,96 @@
+# SANAD Render Blueprint — research deployment only.
+# Review all Render plan prices in the dashboard before applying.
+# No secrets are committed to this file.
+
+envVarGroups:
+  - name: sanad-oidc-shared
+    envVars:
+      - key: OIDC_CLIENT_SECRET
+        generateValue: true
+      - key: KC_BOOTSTRAP_ADMIN_USERNAME
+        value: sanad-bootstrap-admin
+
+databases:
+  - name: sanad-keycloak-db
+    databaseName: sanad_keycloak
+    user: sanad_keycloak
+    plan: basic-256mb
+    region: frankfurt
+    ipAllowList: []
+
 services:
   - type: web
-    name: sanad-demo
-    env: docker
-    plan: free
-    dockerfilePath: ./transport_poc/driver_wallet_api/Dockerfile
-    dockerContext: ./transport_poc/driver_wallet_api
+    name: sanad-keycloak
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    dockerfilePath: transport_poc/keycloak/Dockerfile
+    dockerContext: .
+    autoDeployTrigger: commit
     envVars:
+      - fromGroup: sanad-oidc-shared
+      - key: KC_DB
+        value: postgres
+      - key: KC_DB_URL_HOST
+        fromDatabase:
+          name: sanad-keycloak-db
+          property: host
+      - key: KC_DB_URL_PORT
+        fromDatabase:
+          name: sanad-keycloak-db
+          property: port
+      - key: KC_DB_URL_DATABASE
+        fromDatabase:
+          name: sanad-keycloak-db
+          property: database
+      - key: KC_DB_USERNAME
+        fromDatabase:
+          name: sanad-keycloak-db
+          property: user
+      - key: KC_DB_PASSWORD
+        fromDatabase:
+          name: sanad-keycloak-db
+          property: password
+      - key: KC_HTTP_ENABLED
+        value: "true"
+      - key: KC_HTTP_PORT
+        value: "10000"
+      - key: KC_PROXY_HEADERS
+        value: xforwarded
+      - key: KC_HOSTNAME_STRICT
+        value: "true"
+      - key: KC_HEALTH_ENABLED
+        value: "true"
+      - key: KC_METRICS_ENABLED
+        value: "true"
+      - key: KC_BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+      - key: KC_HOSTNAME
+        value: https://sanad-keycloak.onrender.com
+
+  - type: web
+    name: sanad-demo
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    dockerfilePath: transport_poc/driver_wallet_api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - fromGroup: sanad-oidc-shared
       - key: KEYCLOAK_ISSUER
-        value: http://keycloak-transport:8080/realms/sanad-lab
+        value: https://sanad-keycloak.onrender.com/realms/sanad-lab
+      - key: KEYCLOAK_INTERNAL_HOSTPORT
+        fromService:
+          type: web
+          name: sanad-keycloak
+          property: hostport
       - key: OIDC_CLIENT_ID
         value: driver-wallet-api
       - key: EXPECTED_AUDIENCE
         value: driver-wallet-api
       - key: REQUIRED_WALLET_SCOPE
         value: wallet:read
-      # ملاحظة: المتغيرات السرية (مثل OIDC_CLIENT_SECRET) يجب إدخالها من لوحة تحكم Render وليس هنا.
+      - key: HTTP_TIMEOUT_SECONDS
+        value: "5"
