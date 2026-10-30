@@ -17,7 +17,7 @@ The public issuer must exactly match the `iss` claim returned by Keycloak. The A
 
 ## Cost and region
 
-The blueprint selects Frankfurt and non-free service/database plans because Keycloak requires persistent storage and an always-on production service. Review current Render pricing and the selected database plan in the Render dashboard before applying. This repository change does not create resources or incur charges.
+The blueprint selects Frankfurt and non-free service/database plans because Keycloak requires persistent storage and an always-on production service. Review current Render pricing and the selected database plan in the Render dashboard before applying. This repository change does not create resources or incur charges. Important: the Blueprint also declares the existing `sanad-demo` API as a Frankfurt Starter web service. Applying it will reconcile that existing service away from its current Free/Oregon configuration and may create recurring charges. Do not apply until the dashboard preview and billing estimate have been reviewed and explicitly accepted.
 
 ## Required dashboard actions
 
