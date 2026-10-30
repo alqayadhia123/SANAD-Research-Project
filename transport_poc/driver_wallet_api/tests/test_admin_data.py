@@ -10,7 +10,7 @@ def admin_client(monkeypatch, tmp_path, roles=None):
     claims = {
         "active": True, "client_id": "sanad-driver-web", "sub": "admin-test-001",
         "aud": ["driver-wallet-api"], "scope": "openid wallet:read",
-        "iss": "https://idp.example/realms/sanad-lab", "tenant_id": "tenant-test-001",
+        "iss": "https://idp.example/realms/sanad-lab", "tenant_id": "tenant-test-001", "email": "alqayadhia@gmail.com", "email_verified": True,
         "realm_access": {"roles": roles or ["sanad-admin"]},
     }
     class Response:
@@ -96,7 +96,7 @@ def test_dataset_isolation_between_tenants(monkeypatch, tmp_path):
     other_claims = {
         "active": True, "client_id": "sanad-driver-web", "sub": "other-admin", "aud": ["driver-wallet-api"],
         "scope": "openid wallet:read", "iss": "https://idp.example/realms/sanad-lab",
-        "tenant_id": "tenant-other", "realm_access": {"roles": ["sanad-admin"]},
+        "tenant_id": "tenant-other", "email": "other-admin@example.com", "email_verified": True, "realm_access": {"roles": ["sanad-admin"]},
     }
     class Response:
         def __enter__(self): return self
@@ -115,3 +115,41 @@ def test_dataset_isolation_between_tenants(monkeypatch, tmp_path):
     assert other.get("/api/admin/datasets", headers=headers).get_json()["datasets"] == []
     assert other.get(f"/api/admin/datasets/{dataset_id}/preview",
                      headers=headers).status_code == 404
+
+
+def test_admin_routes_require_allowlisted_verified_email(monkeypatch, tmp_path):
+    client = admin_client(monkeypatch, tmp_path)
+    claims = {
+        "active": True, "client_id": "sanad-driver-web", "sub": "other-user",
+        "aud": ["driver-wallet-api"], "scope": "openid wallet:read",
+        "iss": "https://idp.example/realms/sanad-lab", "tenant_id": "tenant-test-001",
+        "email": "attacker@example.com", "email_verified": True,
+        "realm_access": {"roles": ["sanad-admin"]},
+    }
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def read(self, size=-1): return json.dumps(claims).encode()[:size]
+    monkeypatch.setattr(api, "urlopen", lambda *a, **k: Response())
+    response = client.get("/api/admin/datasets", headers={"Authorization": "Bearer test-token"})
+    assert response.status_code == 403
+    assert response.get_json()["error"] == "admin_identity_not_verified"
+
+
+def test_admin_routes_require_verified_email_claim(monkeypatch, tmp_path):
+    client = admin_client(monkeypatch, tmp_path)
+    claims = {
+        "active": True, "client_id": "sanad-driver-web", "sub": "admin-test-001",
+        "aud": ["driver-wallet-api"], "scope": "openid wallet:read",
+        "iss": "https://idp.example/realms/sanad-lab", "tenant_id": "tenant-test-001",
+        "email": "alqayadhia@gmail.com", "email_verified": False,
+        "realm_access": {"roles": ["sanad-admin"]},
+    }
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def read(self, size=-1): return json.dumps(claims).encode()[:size]
+    monkeypatch.setattr(api, "urlopen", lambda *a, **k: Response())
+    response = client.get("/api/admin/datasets", headers={"Authorization": "Bearer test-token"})
+    assert response.status_code == 403
+    assert response.get_json()["error"] == "admin_identity_not_verified"
