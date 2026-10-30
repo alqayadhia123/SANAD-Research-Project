@@ -248,3 +248,81 @@ def test_documentation_headers_are_present():
     response = client.get("/")
     assert response.headers["Content-Security-Policy"].startswith("default-src 'self'")
     assert response.headers["Cache-Control"] == "no-cache"
+
+def test_route_rejects_missing_bearer():
+    client = api.create_app({"TESTING": True}).test_client()
+    response = client.get("/api/driver/route")
+    assert response.status_code == 401
+    assert response.get_json()["error"] == "bearer_token_required"
+
+
+def test_route_accepts_authorized_synthetic_access(monkeypatch):
+    client = make_client(monkeypatch, active_payload())
+    response = client.get(
+        "/api/driver/route",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["synthetic_data"] is True
+    assert payload["route_id"] == "SANAD-LAB-ROUTE-001"
+
+
+def test_oversized_request_is_rejected_before_authentication():
+    client = api.create_app({"TESTING": True}).test_client()
+    response = client.post(
+        "/api/driver/enroll-authenticator",
+        data=b"x" * (16 * 1024 + 1),
+        content_type="application/octet-stream",
+    )
+    assert response.status_code == 413
+    assert response.get_json()["error"] == "request_too_large"
+
+
+def test_active_claim_must_be_boolean_true(monkeypatch):
+    client = make_client(monkeypatch, active_payload(active="true"))
+    response = client.get(
+        "/api/driver/wallet",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert response.status_code == 401
+
+
+def test_introspection_uses_post_and_client_authentication(monkeypatch):
+    captured = {}
+
+    def fake_urlopen(req, timeout):
+        captured["url"] = req.full_url
+        captured["method"] = req.get_method()
+        captured["authorization"] = req.get_header("Authorization")
+        captured["content_type"] = req.get_header("Content-type")
+        captured["body"] = req.data.decode("utf-8")
+        captured["timeout"] = timeout
+        return FakeResponse(active_payload())
+
+    monkeypatch.setattr(api, "urlopen", fake_urlopen)
+    client = api.create_app({
+        "TESTING": True,
+        "OIDC_CLIENT_ID": "driver-wallet-api",
+        "OIDC_CLIENT_SECRET": "test-secret",
+        "EXPECTED_AUDIENCE": "driver-wallet-api",
+        "REQUIRED_WALLET_SCOPE": "wallet:read",
+        "KEYCLOAK_ISSUER": "https://idp.example/realms/sanad-lab",
+        "HTTP_TIMEOUT_SECONDS": 2.5,
+    }).test_client()
+
+    response = client.get(
+        "/api/driver/wallet",
+        headers={"Authorization": "Bearer sample-token"},
+    )
+
+    assert response.status_code == 200
+    assert captured["url"] == (
+        "https://idp.example/realms/sanad-lab/protocol/openid-connect/token/introspect"
+    )
+    assert captured["method"] == "POST"
+    assert captured["authorization"].startswith("Basic ")
+    assert captured["content_type"] == "application/x-www-form-urlencoded"
+    assert "token=sample-token" in captured["body"]
+    assert captured["timeout"] == 2.5
+
