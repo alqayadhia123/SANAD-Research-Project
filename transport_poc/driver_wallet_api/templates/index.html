@@ -1,124 +1,85 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سند | تطبيق السائق (نسخة محاكاة)</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
-        body { background: #0f172a; color: #fff; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
-        .app-container { max-width: 420px; width: 100%; background: #1e293b; border-radius: 24px; padding: 30px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-        .logo { font-size: 24px; font-weight: 700; color: #38bdf8; }
-        .security-badge { display: flex; align-items: center; gap: 6px; background: #10b98120; color: #10b981; padding: 6px 12px; border-radius: 100px; font-size: 12px; }
-        .security-badge::before { content: "●"; font-size: 8px; }
-        .driver-card { background: linear-gradient(135deg, #38bdf8, #3b82f6); border-radius: 20px; padding: 25px; margin-bottom: 25px; }
-        .driver-label { font-size: 12px; opacity: 0.9; margin-bottom: 5px; }
-        .driver-name { font-size: 22px; font-weight: 700; margin-bottom: 20px; }
-        .wallet-balance { font-size: 40px; font-weight: 800; }
-        .wallet-currency { font-size: 16px; opacity: 0.8; }
-        .info-section { display: grid; gap: 12px; margin-bottom: 25px; }
-        .info-card { background: #334155; padding: 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
-        .info-label { color: #94a3b8; font-size: 13px; }
-        .info-value { font-weight: 600; font-size: 14px; }
-        .status-active { color: #10b981; }
-        .btn { width: 100%; padding: 16px; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
-        .btn-primary { background: #38bdf8; color: #0f172a; margin-bottom: 10px; }
-        .btn-primary:hover { background: #0ea5e9; }
-        .btn-danger { background: #ef4444; color: #fff; }
-        .alert-box { background: #7f1d1d; border-right: 4px solid #ef4444; padding: 16px; border-radius: 12px; margin-bottom: 20px; display: none; }
-        .alert-box.show { display: block; }
-        .alert-title { color: #fca5a5; font-weight: 700; margin-bottom: 4px; }
-        .alert-text { color: #fecaca; font-size: 13px; line-height: 1.6; }
-        .footer-note { text-align: center; font-size: 11px; color: #64748b; margin-top: 20px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f172a">
+  <title>سند | تطبيق السائق - بيئة بحثية</title>
+  <style>
+    * { box-sizing: border-box; font-family: "Segoe UI", Tahoma, sans-serif; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 20px; color: #f8fafc; background: #0f172a; }
+    main { width: min(100%, 460px); padding: 28px; border-radius: 22px; background: #1e293b; box-shadow: 0 20px 50px #0006; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 22px; }
+    h1 { margin: 0; color: #38bdf8; font-size: 26px; }
+    .tag { padding: 6px 10px; border-radius: 99px; background: #334155; color: #cbd5e1; font-size: 11px; }
+    .notice { padding: 12px; margin-bottom: 18px; border-radius: 12px; background: #422006; color: #fde68a; line-height: 1.7; font-size: 13px; }
+    .card { padding: 22px; border-radius: 18px; margin-bottom: 18px; background: linear-gradient(135deg, #0284c7, #2563eb); }
+    .muted { color: #cbd5e1; font-size: 13px; }
+    #driverName { margin: 8px 0 20px; font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
+    #walletBalance { font-size: 36px; font-weight: 800; }
+    .row { display: flex; justify-content: space-between; gap: 12px; padding: 13px; margin: 9px 0; border-radius: 10px; background: #334155; }
+    button { width: 100%; border: 0; border-radius: 10px; padding: 14px; margin-top: 10px; font-size: 15px; font-weight: 700; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: wait; }
+    #refresh { background: #38bdf8; color: #082f49; }
+    #attack { background: #7f1d1d; color: #fee2e2; }
+    #statusMessage { min-height: 24px; margin: 14px 0 0; line-height: 1.6; font-size: 13px; }
+    footer { margin-top: 18px; text-align: center; color: #94a3b8; font-size: 11px; }
+  </style>
 </head>
 <body>
-    <div class="app-container">
-        <div class="header">
-            <div class="logo">سند</div>
-            <div class="security-badge" id="securityBadge">محمي بواسطة WebAuthn</div>
-        </div>
-
-        <div class="alert-box" id="alertBox">
-            <div class="alert-title">🚨 تم اكتشاف محاولة اختراق</div>
-            <div class="alert-text" id="alertText">تم رفض طلب الوصول. الرمز غير صالح أو منتهي الصلاحية.</div>
-        </div>
-
-        <div class="driver-card" id="driverCard">
-            <div class="driver-label">السائق المعتمد</div>
-            <div class="driver-name" id="driverName">جارٍ التحقق...</div>
-            <div class="wallet-label" style="font-size:12px; opacity:0.9;">رصيد المحفظة</div>
-            <div class="wallet-balance" id="walletBalance">--</div>
-            <div class="wallet-currency">ريال سعودي</div>
-        </div>
-
-        <div class="info-section">
-            <div class="info-card">
-                <span class="info-label">حالة المصادقة</span>
-                <span class="info-value status-active" id="authStatus">جاري الفحص...</span>
-            </div>
-            <div class="info-card">
-                <span class="info-label">آخر عملية تحقق</span>
-                <span class="info-value" id="lastCheck">--</span>
-            </div>
-        </div>
-
-        <button class="btn btn-primary" onclick="fetchWallet()">تحديث البيانات</button>
-        <button class="btn btn-danger" onclick="simulateAttack()">🔴 محاكاة هجوم Vishing</button>
-
-        <div class="footer-note">هذا تطبيق بحثي (Research PoC). البيانات اصطناعية.</div>
-    </div>
-
-    <script>
-        // دالة محاكاة الاتصال بالسيرفر
-        function fetchWallet() {
-            // نطلب من المستخدم إدخال التوكن
-            const token = prompt("أدخل الـ Access Token للاختبار (اكتب admin123 للنجاح، أو أي شيء آخر للفشل):");
-            
-            if (!token) return; // إذا ضغط إلغاء
-
-            // محاكاة انتظار الشبكة (نصف ثانية)
-            document.getElementById('authStatus').textContent = 'جاري التحقق...';
-            
-            setTimeout(() => {
-                if (token === 'admin123') {
-                    // حالة النجاح (توكن صحيح)
-                    document.getElementById('driverName').textContent = 'أحمد محمد (سائق)';
-                    document.getElementById('walletBalance').textContent = '1450.00';
-                    document.getElementById('authStatus').textContent = '✅ ناجح';
-                    document.getElementById('authStatus').style.color = '#10b981';
-                    document.getElementById('lastCheck').textContent = new Date().toLocaleTimeString('ar-SA');
-                    document.getElementById('alertBox').classList.remove('show');
-                } else {
-                    // حالة الفشل (توكن خاطئ أو مسروق)
-                    document.getElementById('alertBox').classList.add('show');
-                    document.getElementById('alertText').textContent = `تم رفض الوصول: Token Invalid. النظام حمى المحفظة بنجاح.`;
-                    document.getElementById('driverName').textContent = 'غير مصرح';
-                    document.getElementById('walletBalance').textContent = '🔒';
-                    document.getElementById('authStatus').textContent = '❌ مرفوض';
-                    document.getElementById('authStatus').style.color = '#ef4444';
-                }
-            }, 500);
-        }
-
-        // دالة محاكاة الهجوم
-        function simulateAttack() {
-            document.getElementById('alertBox').classList.add('show');
-            document.getElementById('alertText').textContent = 
-                'محاكاة هجوم Vishing: مهاجم انتحل صوت المدير وطلب تحديث المفتاح. النظام رفض المحاولة لأن WebAuthn يتطلب مفتاحاً فيزيائياً (YubiKey) لا يملكه المهاجم.';
-            document.getElementById('driverName').textContent = 'محمي بواسطة سند';
-            document.getElementById('walletBalance').textContent = '🔒';
-            document.getElementById('authStatus').textContent = '🛡️ الهجوم فشل';
-            document.getElementById('authStatus').style.color = '#10b981';
-        }
-
-        // تشغيل الفحص الأولي عند فتح الصفحة
-        window.onload = () => {
-            document.getElementById('driverName').textContent = 'بانتظار التحقق';
-            document.getElementById('walletBalance').textContent = '💳';
-            document.getElementById('authStatus').textContent = 'غير متصل';
-        };
-    </script>
+<main>
+  <header><h1>سند</h1><span class="tag">Research PoC</span></header>
+  <div class="notice">هذه بيئة اختبار ببيانات اصطناعية. المصادقة تعتمد فحص رمز OIDC عبر Keycloak؛ لا يعني ذلك أن WebAuthn مفعّل أو أن التطبيق صالح للإنتاج.</div>
+  <section class="card" aria-live="polite">
+    <div class="muted">السائق المعتمد</div>
+    <div id="driverName">بانتظار المصادقة</div>
+    <div class="muted">رصيد المحفظة التجريبي</div>
+    <div id="walletBalance">—</div>
+    <div class="muted">ريال سعودي (SAR) · بيانات اصطناعية</div>
+  </section>
+  <div class="row"><span class="muted">حالة المصادقة</span><strong id="authStatus">غير متصل</strong></div>
+  <div class="row"><span class="muted">آخر تحقق</span><strong id="lastCheck">—</strong></div>
+  <button id="refresh" type="button">التحقق من المحفظة</button>
+  <button id="attack" type="button">محاكاة محاولة Vishing (عرض توضيحي)</button>
+  <p id="statusMessage" role="status" aria-live="polite"></p>
+  <footer>لا تستخدم بيانات أو أرصدة حقيقية في هذه النسخة.</footer>
+</main>
+<script>
+  const byId = (id) => document.getElementById(id);
+  const refreshButton = byId("refresh");
+  async function fetchWallet() {
+    const token = window.prompt("ألصق Access Token صادرًا من Keycloak لبيئة الاختبار:");
+    if (!token || !token.trim()) { byId("statusMessage").textContent = "تم إلغاء العملية."; return; }
+    refreshButton.disabled = true;
+    byId("authStatus").textContent = "جارٍ التحقق…";
+    byId("statusMessage").textContent = "";
+    try {
+      const response = await fetch("/api/driver/wallet", {
+        method: "GET",
+        headers: { "Authorization": "Bearer " + token.trim(), "Accept": "application/json" },
+        cache: "no-store"
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || ("HTTP " + response.status));
+      byId("driverName").textContent = data.driver || "سائق تجريبي";
+      byId("walletBalance").textContent = Number(data.wallet_balance).toFixed(2);
+      byId("authStatus").textContent = "تم التحقق";
+      byId("lastCheck").textContent = new Date().toLocaleTimeString("ar-SA");
+      byId("statusMessage").textContent = "نجح فحص الرمز. البيانات المعروضة اصطناعية فقط.";
+    } catch (error) {
+      byId("driverName").textContent = "غير مصرح";
+      byId("walletBalance").textContent = "🔒";
+      byId("authStatus").textContent = "مرفوض";
+      byId("statusMessage").textContent = "تعذر الوصول: " + error.message;
+    } finally { refreshButton.disabled = false; }
+  }
+  refreshButton.addEventListener("click", fetchWallet);
+  byId("attack").addEventListener("click", () => {
+    byId("driverName").textContent = "محاكاة فقط";
+    byId("walletBalance").textContent = "🔒";
+    byId("authStatus").textContent = "حدث توضيحي";
+    byId("statusMessage").textContent = "محاكاة توعوية لهجوم انتحال صوتي. لم يُرسل طلب تغيير مفاتيح ولم يُنفذ اختبار WebAuthn فعلي.";
+  });
+</script>
 </body>
 </html>
