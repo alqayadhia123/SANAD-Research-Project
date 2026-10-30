@@ -3,9 +3,9 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in env.transport}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in env.transport}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in env.transport}
     volumes:
       - transport_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -31,7 +31,7 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
       KC_HEALTH_ENABLED: "true"
     ports:
-  - "${TRANSPORT_API_PORT:-5001}:5001"
+      - "127.0.0.1:${TRANSPORT_KC_HTTP_PORT:-8180}:8080"
     networks: [transport_lab]
 
   driver-api:
@@ -39,13 +39,14 @@ services:
       context: ./driver_wallet_api
     restart: unless-stopped
     depends_on:
-      - keycloak-transport
+      keycloak-transport:
+        condition: service_started
     environment:
       KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER}
-      KEYCLOAK_BROWSER_ISSUER: ${KEYCLOAK_BROWSER_ISSUER}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
       EXPECTED_AUDIENCE: ${EXPECTED_AUDIENCE}
+      HTTP_TIMEOUT_SECONDS: ${HTTP_TIMEOUT_SECONDS:-3}
     ports:
       - "127.0.0.1:${TRANSPORT_API_PORT:-5001}:5001"
     networks: [transport_lab]
