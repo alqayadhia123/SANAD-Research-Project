@@ -111,6 +111,15 @@ def create_app(test_config=None):
             return None, (jsonify(error="insufficient_scope"), 403)
         return claims, None
 
+    @app.before_request
+    def enforce_request_size():
+        # Flask enforces MAX_CONTENT_LENGTH when a body is read. Check the
+        # declared length before route logic so even endpoints that do not
+        # parse a body reject oversized requests consistently.
+        if request.content_length is not None and request.content_length > app.config["MAX_CONTENT_LENGTH"]:
+            return jsonify(error="request_too_large"), 413
+        return None
+
     @app.after_request
     def security_headers(response):
         response.headers["X-Content-Type-Options"] = "nosniff"
