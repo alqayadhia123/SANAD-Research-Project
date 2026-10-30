@@ -141,7 +141,6 @@ def create_app(test_config=None):
             client_id=app.config["PUBLIC_OIDC_CLIENT_ID"],
             redirect_uri=app.config["OIDC_REDIRECT_URI"] or request.url_root.rstrip("/") + "/",
             scopes="openid profile email wallet:read",
-            admin_email=app.config["ADMIN_EMAIL"],
             note="Public OIDC client must be configured for Authorization Code + PKCE (S256).",
         ), 200
 
