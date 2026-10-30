@@ -30,6 +30,7 @@ def create_app(test_config=None):
         KEYCLOAK_INTERNAL_HOSTPORT=os.getenv("KEYCLOAK_INTERNAL_HOSTPORT", "").strip(),
         MAX_CONTENT_LENGTH=6 * 1024 * 1024,
         PUBLIC_OIDC_CLIENT_ID=os.getenv("PUBLIC_OIDC_CLIENT_ID", "sanad-driver-web"),
+        ADMIN_EMAIL=os.getenv("SANAD_ADMIN_EMAIL", "alqayadhia@gmail.com").strip().lower(),
         ALLOWED_TOKEN_CLIENT_IDS=os.getenv("ALLOWED_TOKEN_CLIENT_IDS", os.getenv("PUBLIC_OIDC_CLIENT_ID", "sanad-driver-web")),
         PUBLIC_OIDC_ISSUER=os.getenv("PUBLIC_OIDC_ISSUER", "http://localhost:8080/realms/sanad-lab").rstrip("/"),
         OIDC_REDIRECT_URI=os.getenv("OIDC_REDIRECT_URI", ""),
@@ -139,7 +140,8 @@ def create_app(test_config=None):
             issuer=app.config["PUBLIC_OIDC_ISSUER"],
             client_id=app.config["PUBLIC_OIDC_CLIENT_ID"],
             redirect_uri=app.config["OIDC_REDIRECT_URI"] or request.url_root.rstrip("/") + "/",
-            scopes="openid profile wallet:read",
+            scopes="openid profile email wallet:read",
+            admin_email=app.config["ADMIN_EMAIL"],
             note="Public OIDC client must be configured for Authorization Code + PKCE (S256).",
         ), 200
 
