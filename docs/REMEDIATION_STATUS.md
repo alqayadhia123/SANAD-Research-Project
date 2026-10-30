@@ -18,7 +18,7 @@
 - Synthetic-only wallet and route records; no real funds, customer records, or production transport integrations.
 - Removal of hardcoded browser-side administrator credentials and misleading WebAuthn/Vishing success states.
 - Compose network isolation and loopback-only published API/Keycloak ports.
-- Python tests expanded from 25 to 30 test cases covering route authorization, request-size rejection, strict active-claim typing, and the introspection HTTP request contract. The new 30-test suite is **pending CI confirmation** for this revision.
+- Python tests expanded from 25 to 30 test cases covering route authorization, request-size rejection, strict active-claim typing, and the introspection HTTP request contract. **All 30 tests passed** on commit `f57b0584dbd9329e1806e6d91293035a0e4e429f` in GitHub Actions run [#31](https://github.com/alqayadhia123/SANAD-Research-Project/actions/runs/41090476000).
 
 ## CI evidence and current rerun status
 
@@ -29,7 +29,7 @@ The previous branch head (`1bdfb9fd1e15c43610de7bc7242653b10c78ce8d`) had:
 
 The live integration workflow has now been changed to poll the Keycloak master-realm OIDC discovery document directly, validate required discovery fields, and emit service status/log diagnostics on timeout. This change is intended to improve readiness detection and diagnosis; it is **not yet considered fixed until a new workflow run passes**.
 
-The current revision also adds the 16 KiB request-size guard and five additional tests. Do not report these new tests as passed until GitHub Actions completes successfully on the current commit.
+The revision `f57b0584dbd9329e1806e6d91293035a0e4e429f` also passed the container validation workflow [#13](https://github.com/alqayadhia123/SANAD-Research-Project/actions/runs/41090476019). The live integration workflow [#11](https://github.com/alqayadhia123/SANAD-Research-Project/actions/runs/41090475995) is still running; its result remains pending. The latest documentation-only commit is `2fec096240c0ebce76642f167b20d1f6de06543f`.
 
 ## Not implemented or not yet verified
 
