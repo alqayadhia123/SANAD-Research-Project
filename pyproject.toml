@@ -24,6 +24,7 @@ dev = [
 testpaths = ["tests", "transport_poc/core", "transport_poc/driver_wallet_api/tests"]
 pythonpath = [".", "transport_poc/driver_wallet_api"]
 addopts = "-ra"
+markers = ["integration: requires external service containers"]
 
 [tool.setuptools]
 py-modules = []
