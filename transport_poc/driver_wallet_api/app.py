@@ -53,7 +53,10 @@ def create_app(test_config=None):
         )
         try:
             with urlopen(req, timeout=app.config["HTTP_TIMEOUT_SECONDS"]) as response:
-                payload = json.loads(response.read().decode("utf-8"))
+                raw_payload = response.read(65537)
+            if len(raw_payload) > 65536:
+                return None, "introspection_response_too_large"
+            payload = json.loads(raw_payload.decode("utf-8"))
         except (HTTPError, URLError, TimeoutError, ValueError, OSError):
             return None, "introspection_unavailable"
 
@@ -69,11 +72,12 @@ def create_app(test_config=None):
             return None, "audience_mismatch_or_missing"
 
         issuer = payload.get("iss")
-        if issuer is not None and (
+        if (
             not isinstance(issuer, str)
+            or not issuer.strip()
             or issuer.rstrip("/") != app.config["KEYCLOAK_ISSUER"]
         ):
-            return None, "issuer_mismatch"
+            return None, "issuer_missing_or_mismatch"
 
         subject = payload.get("sub")
         if not isinstance(subject, str) or not subject.strip():
@@ -84,17 +88,33 @@ def create_app(test_config=None):
         header = request.headers.get("Authorization", "")
         if not header.startswith("Bearer ") or not header[7:].strip():
             return None, (jsonify(error="bearer_token_required"), 401)
-        claims, error = introspect(header[7:].strip())
+        token = header[7:].strip()
+        if len(token) > 8192:
+            return None, (jsonify(error="bearer_token_too_large"), 401)
+        claims, error = introspect(token)
         if error:
             status = 503 if error in {
                 "introspection_not_configured", "introspection_unavailable"
             } else 401
             return None, (jsonify(error=error, access="denied"), status)
+        scope = claims.get("scope")
+        if not isinstance(scope, str):
+            return None, (jsonify(error="invalid_scope_claim"), 403)
         required = set(app.config["REQUIRED_WALLET_SCOPE"].split())
-        granted = set(str(claims.get("scope", "")).split())
-        if not required.issubset(granted):
+        granted = set(scope.split())
+        if not required or not required.issubset(granted):
             return None, (jsonify(error="insufficient_scope"), 403)
         return claims, None
+
+    @app.after_request
+    def security_headers(response):
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        if request.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.get("/health")
     def health():
