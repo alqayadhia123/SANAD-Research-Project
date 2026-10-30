@@ -7,7 +7,7 @@ import base64
 import json
 import os
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
 from flask import Flask, jsonify, render_template, request
@@ -156,7 +156,7 @@ def create_app(test_config=None):
             "Content-Security-Policy",
             "default-src 'self'; script-src 'self' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
-            "connect-src 'self'; frame-ancestors 'none'",
+            f"connect-src 'self' {urlparse(app.config['KEYCLOAK_ISSUER']).scheme}://{urlparse(app.config['KEYCLOAK_ISSUER']).netloc}; frame-ancestors 'none'",
         )
         response.headers.setdefault(
             "Cache-Control",

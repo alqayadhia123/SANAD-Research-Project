@@ -171,32 +171,54 @@ def register_admin_routes(app, authorize):
         claims, failure = admin_claims()
         if failure:
             return failure
-        sample = [
-            {"driver_id":"DRV-TEST-001","name":"سائق تجريبي 001","status":"active","city":"Riyadh"},
-            {"driver_id":"DRV-TEST-002","name":"سائق تجريبي 002","status":"pending","city":"Jeddah"},
-            {"driver_id":"DRV-TEST-003","name":"سائق تجريبي 003","status":"suspended","city":"Dammam"}
-        ]
+        samples = {
+            "drivers": [
+                {"driver_id":"DRV-TEST-001","display_name":"سائق تجريبي 001","status":"active","city":"Riyadh"},
+                {"driver_id":"DRV-TEST-002","display_name":"سائق تجريبي 002","status":"pending","city":"Jeddah"},
+                {"driver_id":"DRV-TEST-003","display_name":"سائق تجريبي 003","status":"suspended","city":"Dammam"}
+            ],
+            "wallets": [
+                {"wallet_id":"WLT-TEST-001","driver_id":"DRV-TEST-001","balance":1450.00,"currency":"SAR","classification":"synthetic"},
+                {"wallet_id":"WLT-TEST-002","driver_id":"DRV-TEST-002","balance":320.50,"currency":"SAR","classification":"synthetic"}
+            ],
+            "routes": [
+                {"route_id":"RTE-TEST-001","driver_id":"DRV-TEST-001","pickup":"Test Point A","dropoff":"Test Point B","status":"completed"},
+                {"route_id":"RTE-TEST-002","driver_id":"DRV-TEST-002","pickup":"Test Point C","dropoff":"Test Point D","status":"active"}
+            ],
+            "identity": [
+                {"identity_id":"ID-TEST-001","driver_id":"DRV-TEST-001","verification_status":"verified","method":"lab-only"},
+                {"identity_id":"ID-TEST-002","driver_id":"DRV-TEST-002","verification_status":"pending","method":"lab-only"}
+            ],
+            "security-events": [
+                {"event_id":"EVT-TEST-001","subject":"DRV-TEST-001","event_type":"login_success","result":"synthetic"},
+                {"event_id":"EVT-TEST-002","subject":"DRV-TEST-003","event_type":"access_denied","result":"synthetic"}
+            ]
+        }
         try:
             cipher = _cipher(app)
         except RuntimeError as exc:
             return jsonify(error=str(exc)), 503
-        canonical = json.dumps(sample, ensure_ascii=False, sort_keys=True,
-                               separators=(",", ":")).encode("utf-8")
-        dataset_id = hashlib.sha256(os.urandom(32)).hexdigest()[:24]
         created = datetime.now(timezone.utc).isoformat()
+        ids = []
         try:
-            with _connect(app) as db:
-                db.execute(
-                    "INSERT INTO datasets "
-                    "(id,filename,content_type,row_count,sha256,encrypted_payload,uploaded_by,created_at) "
-                    "VALUES (?,?,?,?,?,?,?,?)",
-                    (dataset_id, "sanad-synthetic-drivers.json", "json",
-                     len(sample), hashlib.sha256(canonical).hexdigest(),
-                     cipher.encrypt(canonical), claims.get("sub", "unknown"), created),
-                )
-            return jsonify(status="seeded_encrypted", id=dataset_id,
-                           row_count=len(sample), synthetic_data=True), 201
-        except OSError:
+            with _database(app) as db:
+                for name, records in samples.items():
+                    canonical = json.dumps(records, ensure_ascii=False, sort_keys=True,
+                                           separators=(",", ":")).encode("utf-8")
+                    dataset_id = hashlib.sha256(os.urandom(32)).hexdigest()[:24]
+                    db.execute(
+                        "INSERT INTO datasets "
+                        "(id,filename,content_type,row_count,sha256,encrypted_payload,uploaded_by,created_at) "
+                        "VALUES (?,?,?,?,?,?,?,?)",
+                        (dataset_id, f"sanad-synthetic-{name}.json", "json",
+                         len(records), hashlib.sha256(canonical).hexdigest(),
+                         cipher.encrypt(canonical), claims.get("sub", "unknown"), created),
+                    )
+                    ids.append(dataset_id)
+            return jsonify(status="seeded_encrypted", id=ids[0], dataset_ids=ids,
+                           dataset_groups=list(samples.keys()), count=len(ids),
+                           synthetic_data=True), 201
+        except (OSError, sqlite3.Error):
             return jsonify(error="dataset_storage_unavailable"), 503
 
     @app.get("/api/admin/datasets/<dataset_id>/preview")
