@@ -14,4 +14,4 @@ COPY templates ./templates
 USER app
 
 EXPOSE 5001
-CMD ["gunicorn", "--workers=2", "--threads=4", "--timeout=30", "--bind=0.0.0.0:5001", "app:app"]
+CMD ["sh", "-c", "exec gunicorn --workers=2 --threads=4 --timeout=30 --bind=0.0.0.0:${PORT:-5001} app:app"]
