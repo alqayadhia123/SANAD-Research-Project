@@ -1,0 +1,86 @@
+import io
+import json
+
+from cryptography.fernet import Fernet
+
+import app as api
+
+
+def admin_client(monkeypatch, tmp_path, roles=None):
+    claims = {
+        "active": True, "sub": "admin-test-001",
+        "aud": ["driver-wallet-api"], "scope": "openid wallet:read",
+        "iss": "https://idp.example/realms/sanad-lab",
+        "realm_access": {"roles": roles or ["sanad-admin"]},
+    }
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def read(self, size=-1): return json.dumps(claims).encode()[:size]
+    monkeypatch.setattr(api, "urlopen", lambda *a, **k: Response())
+    client = api.create_app({
+        "TESTING": True,
+        "OIDC_CLIENT_ID": "driver-wallet-api",
+        "OIDC_CLIENT_SECRET": "test-secret",
+        "EXPECTED_AUDIENCE": "driver-wallet-api",
+        "REQUIRED_WALLET_SCOPE": "wallet:read",
+        "KEYCLOAK_ISSUER": "https://idp.example/realms/sanad-lab",
+        "SANAD_DATA_DIR": str(tmp_path),
+        "SANAD_DATA_ENCRYPTION_KEY": Fernet.generate_key().decode(),
+    }).test_client()
+    return client
+
+
+def test_admin_seed_requires_admin_role(monkeypatch, tmp_path):
+    client = admin_client(monkeypatch, tmp_path, roles=["driver"])
+    response = client.post("/api/admin/datasets/seed",
+                           headers={"Authorization": "Bearer test-token"})
+    assert response.status_code == 403
+    assert response.get_json()["error"] == "admin_role_required"
+
+
+def test_admin_seed_creates_encrypted_synthetic_dataset(monkeypatch, tmp_path):
+    client = admin_client(monkeypatch, tmp_path)
+    response = client.post("/api/admin/datasets/seed",
+                           headers={"Authorization": "Bearer test-token"})
+    assert response.status_code == 201
+    assert response.get_json()["synthetic_data"] is True
+    dataset_id = response.get_json()["id"]
+    preview = client.get(f"/api/admin/datasets/{dataset_id}/preview",
+                         headers={"Authorization": "Bearer test-token"})
+    assert preview.status_code == 200
+    assert len(preview.get_json()["records"]) == 3
+
+
+def test_admin_upload_csv_and_list(monkeypatch, tmp_path):
+    client = admin_client(monkeypatch, tmp_path)
+    response = client.post(
+        "/api/admin/datasets/upload",
+        data={"file": (io.BytesIO(b"driver_id,status\nDRV-001,active\n"), "drivers.csv")},
+        content_type="multipart/form-data",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert response.status_code == 201
+    assert response.get_json()["row_count"] == 1
+    listing = client.get("/api/admin/datasets",
+                         headers={"Authorization": "Bearer test-token"})
+    assert listing.status_code == 200
+    assert listing.get_json()["datasets"][0]["filename"] == "drivers.csv"
+
+
+def test_admin_upload_rejects_unsupported_extension(monkeypatch, tmp_path):
+    client = admin_client(monkeypatch, tmp_path)
+    response = client.post(
+        "/api/admin/datasets/upload",
+        data={"file": (io.BytesIO(b"hello"), "payload.exe")},
+        content_type="multipart/form-data",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "unsupported_file_type"
+
+
+def test_admin_routes_require_authentication(tmp_path):
+    client = api.create_app({"TESTING": True, "SANAD_DATA_DIR": str(tmp_path)}).test_client()
+    response = client.post("/api/admin/datasets/seed")
+    assert response.status_code == 401

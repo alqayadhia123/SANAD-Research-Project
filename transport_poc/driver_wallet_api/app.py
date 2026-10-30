@@ -31,7 +31,7 @@ def create_app(test_config=None):
         MAX_CONTENT_LENGTH=6 * 1024 * 1024,
         PUBLIC_OIDC_CLIENT_ID=os.getenv("PUBLIC_OIDC_CLIENT_ID", "sanad-driver-web"),
         OIDC_REDIRECT_URI=os.getenv("OIDC_REDIRECT_URI", ""),
-        SANAD_DATA_DIR=os.getenv("SANAD_DATA_DIR", "/var/data/sanad"),
+        SANAD_DATA_DIR=os.getenv("SANAD_DATA_DIR", "/tmp/sanad-data"),
         SANAD_DATA_ENCRYPTION_KEY=os.getenv("SANAD_DATA_ENCRYPTION_KEY", ""),
     )
     if test_config:
@@ -141,7 +141,8 @@ def create_app(test_config=None):
         # Flask enforces MAX_CONTENT_LENGTH when a body is read. Check the
         # declared length before route logic so even endpoints that do not
         # parse a body reject oversized requests consistently.
-        if request.content_length is not None and request.content_length > app.config["MAX_CONTENT_LENGTH"]:
+        limit = app.config["MAX_CONTENT_LENGTH"] if request.path == "/api/admin/datasets/upload" else 16 * 1024
+        if request.content_length is not None and request.content_length > limit:
             return jsonify(error="request_too_large"), 413
         return None
 

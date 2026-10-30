@@ -1,5 +1,6 @@
 """Admin-only synthetic dataset API with authenticated encryption at rest."""
 import csv
+from contextlib import contextmanager
 import hashlib
 import io
 import json
@@ -21,6 +22,16 @@ def _db_path(app):
     root = Path(app.config["SANAD_DATA_DIR"])
     root.mkdir(parents=True, exist_ok=True)
     return root / "datasets.sqlite3"
+
+
+@contextmanager
+def _database(app):
+    db = _connect(app)
+    try:
+        yield db
+        db.commit()
+    finally:
+        db.close()
 
 
 def _connect(app):
@@ -99,13 +110,13 @@ def register_admin_routes(app, authorize):
         if failure:
             return failure
         try:
-            with _connect(app) as db:
+            with _database(app) as db:
                 rows = db.execute(
                     "SELECT id,filename,content_type,row_count,sha256,uploaded_by,created_at "
                     "FROM datasets ORDER BY created_at DESC"
                 ).fetchall()
             return jsonify(datasets=[dict(row) for row in rows], synthetic_data=True), 200
-        except OSError:
+        except (OSError, sqlite3.Error):
             return jsonify(error="dataset_storage_unavailable"), 503
 
     @app.post("/api/admin/datasets/upload")
