@@ -4,6 +4,14 @@
 **Branch:** `fix/sanad-p0-security-baseline`  
 **Gate:** `PRODUCTION_GATE=CLOSED`
 
+## Keycloak readiness root-cause correction (2026-10-30)
+
+The screenshot showed the live workflow waiting at OIDC discovery while the SANAD API startup step had completed. Source review identified a deterministic readiness-validator defect: the workflow required the metadata property `introspection_endpoint`, but Keycloak publishes the OAuth token introspection metadata field as `token_introspection_endpoint`. The endpoint itself is documented by Keycloak at `/realms/{realm}/protocol/openid-connect/token/introspect`, and the metadata property is named `token_introspection_endpoint`.
+
+The validator has been corrected in commit `854fd5c5db049c02fdc07d28094dff9399bb5cf0`. This correction addresses the false-negative readiness condition; it does not yet prove Keycloak is healthy or that live token authorization succeeds. The next workflow run must pass realm provisioning and the real-token assertions before live integration is marked PASS.
+
+Reference: [Keycloak OIDC layers documentation](https://www.keycloak.org/securing-apps/oidc-layers).
+
 ## Implemented in the remediation branch
 
 - Flask application factory and explicit route registration.
