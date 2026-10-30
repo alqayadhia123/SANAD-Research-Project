@@ -11,6 +11,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from flask import Flask, jsonify, render_template, request
+from admin_data import register_admin_routes
 
 
 def create_app(test_config=None):
@@ -27,7 +28,11 @@ def create_app(test_config=None):
         HTTP_TIMEOUT_SECONDS=float(os.getenv("HTTP_TIMEOUT_SECONDS", "3")),
         INTROSPECTION_URL=os.getenv("INTROSPECTION_URL", ""),
         KEYCLOAK_INTERNAL_HOSTPORT=os.getenv("KEYCLOAK_INTERNAL_HOSTPORT", "").strip(),
-        MAX_CONTENT_LENGTH=16 * 1024,
+        MAX_CONTENT_LENGTH=6 * 1024 * 1024,
+        PUBLIC_OIDC_CLIENT_ID=os.getenv("PUBLIC_OIDC_CLIENT_ID", "sanad-driver-web"),
+        OIDC_REDIRECT_URI=os.getenv("OIDC_REDIRECT_URI", ""),
+        SANAD_DATA_DIR=os.getenv("SANAD_DATA_DIR", "/var/data/sanad"),
+        SANAD_DATA_ENCRYPTION_KEY=os.getenv("SANAD_DATA_ENCRYPTION_KEY", ""),
     )
     if test_config:
         app.config.update(test_config)
@@ -118,6 +123,18 @@ def create_app(test_config=None):
         if not required or not required.issubset(granted):
             return None, (jsonify(error="insufficient_scope"), 403)
         return claims, None
+
+    register_admin_routes(app, require_wallet_access)
+
+    @app.get("/lab/config")
+    def lab_config():
+        return jsonify(
+            issuer=app.config["KEYCLOAK_ISSUER"],
+            client_id=app.config["PUBLIC_OIDC_CLIENT_ID"],
+            redirect_uri=app.config["OIDC_REDIRECT_URI"] or request.url_root.rstrip("/") + "/",
+            scopes="openid profile wallet:read",
+            note="Public OIDC client must be configured for Authorization Code + PKCE (S256).",
+        ), 200
 
     @app.before_request
     def enforce_request_size():
