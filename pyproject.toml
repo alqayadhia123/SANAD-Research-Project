@@ -10,6 +10,7 @@ requires-python = ">=3.10"
 dependencies = [
   "Flask==3.1.2",
   "gunicorn==23.0.0",
+  "redis==5.2.1",
 ]
 
 [project.optional-dependencies]
@@ -18,8 +19,8 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["transport_poc/driver_wallet_api"]
+testpaths = ["tests", "transport_poc/core", "transport_poc/driver_wallet_api/tests"]
+pythonpath = [".", "transport_poc/driver_wallet_api"]
 addopts = "-ra"
 
 [tool.setuptools]
