@@ -47,7 +47,14 @@ jobs:
           EOF
 
       - name: Start PostgreSQL, Keycloak, and SANAD API
-        run: docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml up --build -d
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=20s 300s \
+            docker compose --env-file transport_poc/.env \
+            -f transport_poc/docker-compose.transport.yaml up --build -d
+          docker compose --env-file transport_poc/.env \
+            -f transport_poc/docker-compose.transport.yaml ps --all
 
       - name: Wait for Keycloak OIDC discovery
         shell: bash
@@ -200,9 +207,24 @@ jobs:
           print("Live Keycloak introspection integration passed: missing=401 insufficient_scope=403 valid=200 invalid=401")
           PY
 
-      - name: Collect service logs on failure
-        if: failure()
-        run: docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml logs --no-color
+      - name: Collect service diagnostics
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          COMPOSE=(docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml)
+          echo "===== COMPOSE STATUS ====="
+          "${COMPOSE[@]}" ps --all
+          echo "===== CONTAINER HEALTH ====="
+          IDS=$("${COMPOSE[@]}" ps -aq)
+          if [ -n "$IDS" ]; then
+            docker inspect --format '{{.Name}} state={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} exit={{.State.ExitCode}}' $IDS
+          else
+            echo "No Compose containers were created."
+          fi
+          echo "===== SERVICE LOGS (last 250 lines) ====="
+          "${COMPOSE[@]}" logs --no-color --tail=250
+          exit 0
 
       - name: Stop services and remove CI volumes
         if: always()
