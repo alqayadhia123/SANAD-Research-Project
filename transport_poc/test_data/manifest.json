@@ -1,0 +1,23 @@
+{
+  "dataset_id": "SANAD-TEST-DATA-1.0",
+  "classification": "SYNTHETIC_ONLY",
+  "schema_version": "1.0.0",
+  "created_for": "SANAD research proof of concept",
+  "environment": "isolated_test_only",
+  "records": {
+    "drivers": "drivers.json",
+    "wallets": "wallets.json",
+    "routes": "routes.json",
+    "security_events": "security_events.json",
+    "scenarios": "scenarios.json"
+  },
+  "rules": [
+    "No real personal data, credentials, access tokens, payment details, or live location data.",
+    "All records must use stable unique IDs.",
+    "Relationships must resolve to existing records.",
+    "Scenario status must be NOT_RUN, PASS, FAIL, or BLOCKED.",
+    "PASS and FAIL require evidence_ref, executed_at, and tested_commit_sha.",
+    "Never import this dataset into production systems."
+  ],
+  "notes": "Seed fixtures are illustrative test data, not experimental findings."
+}
