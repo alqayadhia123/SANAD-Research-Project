@@ -84,3 +84,34 @@ def test_admin_routes_require_authentication(tmp_path):
     client = api.create_app({"TESTING": True, "SANAD_DATA_DIR": str(tmp_path)}).test_client()
     response = client.post("/api/admin/datasets/seed")
     assert response.status_code == 401
+
+
+
+def test_dataset_isolation_between_tenants(monkeypatch, tmp_path):
+    owner = admin_client(monkeypatch, tmp_path)
+    seeded = owner.post("/api/admin/datasets/seed",
+                        headers={"Authorization": "Bearer test-token"})
+    dataset_id = seeded.get_json()["id"]
+
+    other_claims = {
+        "active": True, "sub": "other-admin", "aud": ["driver-wallet-api"],
+        "scope": "openid wallet:read", "iss": "https://idp.example/realms/sanad-lab",
+        "tenant_id": "tenant-other", "realm_access": {"roles": ["sanad-admin"]},
+    }
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def read(self, size=-1): return json.dumps(other_claims).encode()[:size]
+    monkeypatch.setattr(api, "urlopen", lambda *a, **k: Response())
+    other = api.create_app({
+        "TESTING": True, "OIDC_CLIENT_ID": "driver-wallet-api",
+        "OIDC_CLIENT_SECRET": "test-secret", "EXPECTED_AUDIENCE": "driver-wallet-api",
+        "REQUIRED_WALLET_SCOPE": "wallet:read",
+        "KEYCLOAK_ISSUER": "https://idp.example/realms/sanad-lab",
+        "SANAD_DATA_DIR": str(tmp_path),
+        "SANAD_DATA_ENCRYPTION_KEY": owner.application.config["SANAD_DATA_ENCRYPTION_KEY"],
+    }).test_client()
+    headers = {"Authorization": "Bearer test-token"}
+    assert other.get("/api/admin/datasets", headers=headers).get_json()["datasets"] == []
+    assert other.get(f"/api/admin/datasets/{dataset_id}/preview",
+                     headers=headers).status_code == 404

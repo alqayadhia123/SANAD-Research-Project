@@ -156,7 +156,7 @@ def register_admin_routes(app, authorize):
         created = datetime.now(timezone.utc).isoformat()
         subject = claims.get("sub", "unknown")
         try:
-            with _connect(app) as db:
+            with _database(app) as db:
                 db.execute(
                     "INSERT INTO datasets "
                     "(id,tenant_id,filename,content_type,row_count,sha256,encrypted_payload,uploaded_by,created_at) "
@@ -168,7 +168,7 @@ def register_admin_routes(app, authorize):
                            row_count=len(records), sha256=digest,
                            encryption="Fernet authenticated encryption",
                            synthetic_data=True), 201
-        except OSError:
+        except (OSError, sqlite3.Error):
             return jsonify(error="dataset_storage_unavailable"), 503
 
     @app.post("/api/admin/datasets/seed")

@@ -157,7 +157,7 @@ def create_app(test_config=None):
             "Content-Security-Policy",
             "default-src 'self'; script-src 'self' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
-            f"connect-src 'self' {urlparse(app.config['PUBLIC_OIDC_ISSUER']).scheme}://{urlparse(app.config['KEYCLOAK_ISSUER']).netloc}; frame-ancestors 'none'",
+            f"connect-src 'self' {urlparse(app.config['PUBLIC_OIDC_ISSUER']).scheme}://{urlparse(app.config['PUBLIC_OIDC_ISSUER']).netloc}; frame-ancestors 'none'",
         )
         response.headers.setdefault(
             "Cache-Control",
