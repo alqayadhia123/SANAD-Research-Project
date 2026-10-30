@@ -94,7 +94,10 @@ def create_app(test_config=None):
         claims, error = introspect(token)
         if error:
             status = 503 if error in {
-                "introspection_not_configured", "introspection_unavailable"
+                "introspection_not_configured",
+                "introspection_unavailable",
+                "introspection_response_too_large",
+                "invalid_introspection_response",
             } else 401
             return None, (jsonify(error=error, access="denied"), status)
         scope = claims.get("scope")
