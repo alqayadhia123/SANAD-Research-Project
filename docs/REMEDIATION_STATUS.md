@@ -8,7 +8,7 @@
 
 The screenshot showed the live workflow waiting at OIDC discovery while the SANAD API startup step had completed. Source review identified a deterministic readiness-validator defect: the workflow required the metadata property `introspection_endpoint`, but Keycloak publishes the OAuth token introspection metadata field as `token_introspection_endpoint`. The endpoint itself is documented by Keycloak at `/realms/{realm}/protocol/openid-connect/token/introspect`, and the metadata property is named `token_introspection_endpoint`.
 
-The validator has been corrected in commit `854fd5c5db049c02fdc07d28094dff9399bb5cf0`. This correction addresses the false-negative readiness condition; it does not yet prove Keycloak is healthy or that live token authorization succeeds. The next workflow run must pass realm provisioning and the real-token assertions before live integration is marked PASS.
+The validator has been corrected in commit `854fd5c5db049c02fdc07d28094dff9399bb5cf0`. The workflow was then hardened in commit `9afbe7778fb56aeab64ad3f4189fd92354492390` with a 15-minute job ceiling, a bounded readiness probe, and branch-level concurrency to prevent duplicate push/PR runs from occupying runners. Python and container workflows passed on commit `fb171881d7f9d067b81d209527bff662d785c1f4`; the live integration workflow #16 on that revision remains in progress. The readiness correction addresses the false-negative field check; it does not yet prove Keycloak is healthy or that live token authorization succeeds. Realm provisioning and real-token assertions must pass before live integration is marked PASS.
 
 Reference: [Keycloak OIDC layers documentation](https://www.keycloak.org/securing-apps/oidc-layers).
 
