@@ -57,6 +57,7 @@ def test_wallet_accepts_active_token_with_expected_issuer_and_audience(monkeypat
             "aud": ["driver-wallet-api"],
             "iss": ISSUER,
             "preferred_username": "synthetic-driver-01",
+            "tenant_id": "test-fleet",
         },
     )
     response = make_app().test_client().get(
