@@ -6,27 +6,34 @@
 
 ## Project overview
 
-SANAD is an early-stage security-focused project exploring trusted digital identity and safer operations for driver and mobility services. Its current proof of concept includes a FastAPI service, Keycloak-based token introspection and authorization checks, containerized development services, and automated security tests.
+SANAD is an early-stage research proof of concept exploring trusted digital identity and safer operations for driver and mobility services. The current implementation is a **Flask API** with Keycloak OIDC token introspection and scope-based authorization, containerized lab services, and automated tests.
 
-The mobility-oriented direction, branded **SANAD Mobility**, is to explore stronger driver identity assurance and protection against impersonation and social-engineering attacks in transport workflows.
+The mobility-oriented direction, branded **SANAD Mobility**, is to explore stronger driver identity assurance and protection against impersonation and social-engineering attacks in transport workflows. These are research objectives, not capabilities already demonstrated by the current prototype.
 
 ## Current implementation status
 
-- Implemented: initial API proof of concept, Keycloak token validation and scope checks, baseline HTTP security controls, request/response size limits, and automated Python tests.
-- Verified in CI: Python test suite and container build/health smoke test (see the linked GitHub Actions runs in the project pull request).
-- Not yet verified: successful live end-to-end integration of Keycloak, PostgreSQL, and the API. The latest integration attempt stopped while waiting for Keycloak readiness.
-- Not yet implemented or demonstrated as complete: production WebAuthn enrollment, account recovery, full transport operations, AI fraud-detection model, IoT integration, and field deployment.
+- **Implemented:** Flask application factory, fail-closed Keycloak introspection baseline, issuer/audience/subject/scope checks, request and token size limits, baseline HTTP security headers, synthetic wallet/route endpoints, and a mocked pytest suite.
+- **Verified in CI:** 30 Python tests passed on commit `f57b0584dbd9329e1806e6d91293035a0e4e429f`; container build and `/health` smoke test passed on the same commit.
+- **Live integration:** The revised workflow now waits for the Keycloak OIDC discovery endpoint rather than the root path. Its current run must pass before live Keycloak integration can be considered verified.
+- **Not implemented or demonstrated:** real WebAuthn registration/assertion, secure account recovery, independent transaction approval, persistent tamper-evident audit logging, measured revocation latency, AI fraud detection, IoT integration, and field deployment.
+
+## Architecture and verification documents
+
+- [Remediation status and validation record](docs/REMEDIATION_STATUS.md)
+- [Verification plan and evidence register](docs/VERIFICATION_PLAN.md)
+- [Threat model and research claim boundaries](docs/THREAT_MODEL.md)
+- [Transport PoC operating notes](transport_poc/README.md)
 
 ## Development and verification
 
-The active hardening work is being conducted on the branch:
+The active hardening work is being conducted on:
 
 `fix/sanad-p0-security-baseline`
 
-The related pull request is [PR #4](https://github.com/alqayadhia123/SANAD-Research-Project/pull/4). It remains a Draft pull request; the default branch has not been merged with this work.
+The related pull request is [PR #4](https://github.com/alqayadhia123/SANAD-Research-Project). It remains a Draft pull request; the default branch has not been merged with this work.
 
-**Production gate:** CLOSED. This repository currently represents a development proof of concept, not a production-ready transport security platform.
+**Production gate: CLOSED.** This repository currently represents a research development proof of concept, not a production-ready transport security platform. A passing unit suite or container health check is not evidence of resistance to vishing or account takeover.
 
 ## Contact and project ownership
 
-For project ownership and source history, refer to the GitHub account [@alqayadhia123](https://github.com/alqayadhia123) and the commit history of this repository.
+For project ownership and source history, refer to [@alqayadhia123](https://github.com/alqayadhia123) and the repository commit history.
