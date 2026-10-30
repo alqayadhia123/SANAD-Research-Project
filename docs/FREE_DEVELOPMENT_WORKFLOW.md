@@ -30,7 +30,13 @@ git switch fix/sanad-p0-security-baseline
 
 ## 3. Create local-only environment settings
 
-Create `transport_poc/.env` locally. Do not commit it, upload it as an artifact, or paste its values into issues or chat.
+Copy `transport_poc/.env.example` to `transport_poc/.env` locally, then replace every placeholder with a unique random value. Do not commit it, upload it as an artifact, or paste its values into issues or chat.
+
+```bash
+cp transport_poc/.env.example transport_poc/.env
+```
+
+Then edit `transport_poc/.env` and set the local values shown below:
 
 ```dotenv
 POSTGRES_DB=sanad_local
@@ -62,7 +68,7 @@ Local endpoints (bound to loopback by the Compose file):
 - Keycloak: `http://127.0.0.1:8080`
 - Flask API: `http://127.0.0.1:5001/health`
 
-The Keycloak container uses `start-dev` only for the isolated local lab. It is not a production configuration. Complete the Realm and confidential API client configuration in the local Keycloak admin console according to the deployment runbook before running authenticated integration tests.
+Compose waits for the Keycloak readiness health check before starting the API. The Keycloak container uses `start-dev` only for the isolated local lab. It is not a production configuration. Complete the Realm and confidential API client configuration in the local Keycloak admin console according to the deployment runbook before running authenticated integration tests.
 
 Stop without deleting the PostgreSQL volume:
 
