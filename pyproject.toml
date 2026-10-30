@@ -27,4 +27,5 @@ addopts = "-ra"
 markers = ["integration: requires external service containers"]
 
 [tool.setuptools]
+packages = ["transport_poc", "transport_poc.core", "transport_poc.core.jobs", "transport_poc.driver_wallet_api"]
 py-modules = []
