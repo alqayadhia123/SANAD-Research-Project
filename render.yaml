@@ -4,7 +4,7 @@ services:
     env: docker
     plan: free
     dockerfilePath: ./transport_poc/driver_wallet_api/Dockerfile
-    dockerContext: ./transport_poc/driver_wallet_api
+    dockerContext: .
     envVars:
       # Set a reachable HTTPS Keycloak issuer in the Render dashboard.
       # Compose-only hostnames are not reachable from Render.
