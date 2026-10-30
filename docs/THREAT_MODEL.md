@@ -57,11 +57,11 @@ The Compose network is intended for a local lab. Published API and Keycloak port
 - The API's expected issuer, audience, client ID, client secret, and required scope are provisioned through a trusted deployment environment.
 - Test users, wallet values, and route details are synthetic.
 - The current API is not connected to real payment, transport dispatch, or production driver records.
-- The current integration test uses disposable credentials and a test-only password grant; it is not a recommendation for production user authentication.
+- The current integration workflow uses a disposable confidential service client with the OAuth 2.0 Client Credentials grant. This validates service-to-service token introspection only; it does not validate an interactive driver login, passkey ceremony, or human authentication assurance.
 
 ## 6. Security acceptance criteria before expanding scope
 
-- Complete live Keycloak/PostgreSQL/API integration on the current commit.
+- Complete live Keycloak/PostgreSQL/API integration on the current commit, with captured assertions for valid, missing, insufficient-scope, and invalid tokens.
 - Verify missing, inactive, expired, wrong-issuer, wrong-audience, insufficient-scope, and invalid tokens against the live identity provider.
 - Measure revocation propagation and document introspection cache behavior (if any).
 - Implement and independently test WebAuthn registration/assertion, challenge single-use, origin/RP ID binding, signature validation, and replay rejection before claiming passkey protection.
