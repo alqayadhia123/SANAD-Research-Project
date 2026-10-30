@@ -10,17 +10,25 @@ requires-python = ">=3.10"
 dependencies = [
   "Flask==3.1.2",
   "gunicorn==23.0.0",
+  "redis==5.2.1",
+  "celery==5.4.0",
+  "requests==2.32.5",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8.3,<9",
+  "ruff>=0.9,<1",
+  "bandit>=1.7,<2",
+  "pip-audit>=2.7,<3",
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["transport_poc/driver_wallet_api"]
+testpaths = ["tests", "transport_poc/core", "transport_poc/driver_wallet_api/tests"]
+pythonpath = [".", "transport_poc/driver_wallet_api"]
 addopts = "-ra"
+markers = ["integration: requires external service containers"]
 
 [tool.setuptools]
+packages = ["transport_poc", "transport_poc.core", "transport_poc.core.jobs", "transport_poc.driver_wallet_api"]
 py-modules = []

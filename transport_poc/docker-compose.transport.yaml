@@ -1,4 +1,16 @@
 services:
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - transport_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [transport_lab]
   postgres-transport:
     image: postgres:16
     restart: unless-stopped
@@ -34,11 +46,14 @@ services:
     networks: [transport_lab]
   driver-api:
     build:
-      context: ./driver_wallet_api
+      context: ..
+      dockerfile: transport_poc/driver_wallet_api/Dockerfile
     restart: unless-stopped
     depends_on:
       keycloak-transport:
         condition: service_started
+      redis:
+        condition: service_healthy
     environment:
       PORT: "5001"
       KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:?Set KEYCLOAK_ISSUER in env.transport}
@@ -46,11 +61,42 @@ services:
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?Set OIDC_CLIENT_SECRET in env.transport}
       EXPECTED_AUDIENCE: ${EXPECTED_AUDIENCE:?Set EXPECTED_AUDIENCE in env.transport}
       HTTP_TIMEOUT_SECONDS: ${HTTP_TIMEOUT_SECONDS:-3}
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "127.0.0.1:${TRANSPORT_API_PORT:-5001}:5001"
+    networks: [transport_lab]
+  celery-worker:
+    build:
+      context: ../..
+      dockerfile: transport_poc/driver_wallet_api/Dockerfile
+    command: ["celery", "-A", "transport_poc.core.celery_app:celery_app", "worker", "--loglevel=INFO", "--concurrency=2", "--queues=sanad-background"]
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      SANAD_AUDIT_DIR: /var/log/sanad/audit
+      SANAD_REPORT_DIR: /var/lib/sanad/reports
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [transport_lab]
+  scheduler:
+    build:
+      context: ../..
+      dockerfile: transport_poc/driver_wallet_api/Dockerfile
+    command: ["python", "-m", "transport_poc.core.leader_scheduler"]
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      SANAD_CLEANUP_INTERVAL: ${SANAD_CLEANUP_INTERVAL:-3600}
+      SANAD_HEALTH_INTERVAL: ${SANAD_HEALTH_INTERVAL:-300}
+      SANAD_ALERT_INTERVAL: ${SANAD_ALERT_INTERVAL:-60}
+    depends_on:
+      redis:
+        condition: service_healthy
     networks: [transport_lab]
 networks:
   transport_lab:
     internal: true
 volumes:
   transport_postgres_data:
+  transport_redis_data:
