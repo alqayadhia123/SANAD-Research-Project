@@ -28,7 +28,7 @@ jobs:
 
       - name: Prepare non-production validation environment
         run: |
-          cat > .env <<'EOF'
+          cat > transport_poc/.env <<'EOF'
           POSTGRES_DB=sanad_validation
           POSTGRES_USER=sanad_validation
           POSTGRES_PASSWORD=validation-only-not-a-secret
@@ -40,7 +40,7 @@ jobs:
           EOF
 
       - name: Validate Compose configuration
-        run: docker compose -f transport_poc/docker-compose.transport.yaml config --quiet
+        run: docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml config --quiet
 
       - name: Build API image
         run: docker build --tag sanad-driver-api:ci transport_poc/driver_wallet_api
@@ -66,4 +66,4 @@ jobs:
         if: always()
         run: |
           docker rm --force sanad-driver-api-ci || true
-          rm -f .env
+          rm -f transport_poc/.env
