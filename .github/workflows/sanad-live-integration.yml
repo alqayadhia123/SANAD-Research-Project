@@ -48,15 +48,24 @@ jobs:
       - name: Wait for Keycloak
         shell: bash
         run: |
+          set -euo pipefail
+          KEYCLOAK_URL="http://127.0.0.1:18080"
           for attempt in $(seq 1 90); do
-            if curl --fail --silent http://127.0.0.1:18080/realms/master/.well-known/openid-configuration >/dev/null; then
-              echo "Keycloak is responding"
-              exit 0
+            HTTP_STATUS=$(curl --silent --show-error --max-time 3 --output /dev/null --write-out '%{http_code}' "$KEYCLOAK_URL/" || true)
+            if [[ "$HTTP_STATUS" =~ ^[23][0-9][0-9]$ ]]; then
+              echo "Keycloak HTTP endpoint is responding (HTTP $HTTP_STATUS)"
+              break
+            fi
+            if [[ "$attempt" -eq 90 ]]; then
+              echo "Keycloak did not expose its HTTP endpoint; last status: ${HTTP_STATUS:-no-response}"
+              docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml ps
+              docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml logs --no-color keycloak-transport postgres-transport
+              exit 1
             fi
             sleep 3
           done
-          docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml logs --no-color keycloak-transport postgres-transport
-          exit 1
+          curl --fail --silent --show-error --max-time 10 "$KEYCLOAK_URL/realms/master/.well-known/openid-configuration" >/dev/null
+          echo "Keycloak master-realm OIDC discovery is responding"
 
       - name: Configure disposable realm, client, scope, and test user
         shell: bash
