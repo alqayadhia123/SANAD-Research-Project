@@ -133,11 +133,21 @@ def test_introspection_outage_fails_closed(monkeypatch):
     assert response.status_code == 503
 
 
-def test_enrollment_is_explicitly_not_implemented():
+def test_enrollment_requires_authorization(monkeypatch):
     client = api.create_app({"TESTING": True}).test_client()
     response = client.post("/api/driver/enroll-authenticator", json={
         "authenticator_id": "attacker-controlled"
     })
+    assert response.status_code == 401
+
+
+def test_enrollment_is_explicitly_not_implemented_after_auth(monkeypatch):
+    client = make_client(monkeypatch, active_payload())
+    response = client.post(
+        "/api/driver/enroll-authenticator",
+        json={"authenticator_id": "attacker-controlled"},
+        headers={"Authorization": "Bearer test-token"},
+    )
     assert response.status_code == 501
     assert response.get_json()["error"] == "not_implemented"
 
@@ -216,3 +226,25 @@ def test_wallet_rejects_empty_required_scope_configuration(monkeypatch):
     response = client.get("/api/driver/wallet",
                           headers={"Authorization": "Bearer test-token"})
     assert response.status_code == 403
+
+
+def test_bearer_scheme_is_case_insensitive(monkeypatch):
+    client = make_client(monkeypatch, active_payload())
+    response = client.get("/api/driver/wallet",
+                          headers={"Authorization": "bearer test-token"})
+    assert response.status_code == 200
+
+
+def test_lab_ready_reports_configuration_only():
+    client = api.create_app({"TESTING": True, "OIDC_CLIENT_SECRET": "configured"}).test_client()
+    response = client.get("/lab/ready")
+    assert response.status_code == 200
+    assert response.get_json()["client_secret_configured"] is True
+    assert "not evidence" in response.get_json()["note"]
+
+
+def test_documentation_headers_are_present():
+    client = api.create_app({"TESTING": True}).test_client()
+    response = client.get("/")
+    assert response.headers["Content-Security-Policy"].startswith("default-src 'self'")
+    assert response.headers["Cache-Control"] == "no-cache"
