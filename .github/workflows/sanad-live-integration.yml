@@ -98,7 +98,8 @@ jobs:
               -s publicClient=false \
               -s clientAuthenticatorType=client-secret \
               -s secret=ci-only-client-secret \
-              -s directAccessGrantsEnabled=true)
+              -s directAccessGrantsEnabled=false \\
+              -s serviceAccountsEnabled=true)
             kcadm.sh create "clients/$CLIENT_ID/protocol-mappers/models" -r sanad-lab \
               -s name=sanad-api-audience \
               -s protocol=openid-connect \
@@ -119,9 +120,6 @@ jobs:
               -s "config.access.token.claim=true" \
               -s "config.id.token.claim=false"
             kcadm.sh update "clients/$CLIENT_ID/optional-client-scopes/$SCOPE_ID" -r sanad-lab
-            kcadm.sh create users -r sanad-lab -s username=sanad-ci-user -s enabled=true
-            USER_ID=$(kcadm.sh get users -r sanad-lab -q username=sanad-ci-user --fields id --format csv --noquotes | tail -n 1)
-            kcadm.sh set-password -r sanad-lab --userid "$USER_ID" --new-password ci-only-user-password
           '
 
       - name: Wait for SANAD API
@@ -158,15 +156,12 @@ jobs:
           token_url = "http://keycloak-transport:8080/realms/sanad-lab/protocol/openid-connect/token"
           client_id = "driver-wallet-api"
           client_secret = "ci-only-client-secret"
-          password = "ci-only-user-password"
 
           def issue_token(scope=None):
               fields = {
-                  "grant_type": "password",
+                  "grant_type": "client_credentials",
                   "client_id": client_id,
                   "client_secret": client_secret,
-                  "username": "sanad-ci-user",
-                  "password": password,
               }
               if scope:
                   fields["scope"] = scope
