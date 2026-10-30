@@ -1,42 +1,36 @@
 # SANAD P1 Remediation Status
 
-**Status:** In progress — not accepted for operational or production use.
+**Status: IN PROGRESS — not approved for production.**
 
-## Baseline
-This work is based on hardening/transport-poc-2026-10-30, not main. SANAD
-remains a Flask/Keycloak research PoC. No production deployment, real financial
-wallet, WebAuthn ceremony, or production-grade HA is claimed.
+## Implemented in this branch
+- Flask API introspects bearer tokens at the before-request boundary; tenant-protected endpoints run only after successful Keycloak introspection.
+- Tenant membership is derived only from claims returned by the trusted Keycloak introspection endpoint. Header/subdomain values are selectors, never authorization evidence.
+- Missing identity returns 401; unauthorized tenant selection returns 403; ambiguous multi-tenant identity requires an explicit selector.
+- Request teardown resets the ContextVar token.
+- Redis leader lease acquire/renew/release use atomic Lua scripts, owner-checked release, lease-loss detection, and a monotonic fencing counter.
+- A dedicated leader-elected dispatcher sends periodic Celery tasks. It halts dispatch if leadership cannot be verified.
+- Redis, API, worker, and scheduler are separate Compose services.
+- Redis lease integration tests are wired into CI.
+- RLS prerequisite migration is fail-closed and transaction-local.
 
-## Implemented in this slice
-- Tenant membership is derived only from verified claims supplied by upstream
-  authentication middleware.
-- X-Tenant-ID and subdomains are selectors, never proof of authorization.
-- Missing identity returns 401; unauthorized tenant selection returns 403.
-- Flask teardown resets the ContextVar token to prevent cross-request leakage.
-- Redis lease acquire/renew/release use atomic Lua scripts.
-- Redis errors and lease loss fail closed.
-- Leader election returns a monotonically increasing fencing token.
+## Explicit limitations
+- Keycloak realm/client configuration must expose tenant_id or tenants as introspection claims. The application intentionally denies tenant access if the claim is absent.
+- PostgreSQL is not yet used by the wallet API. The migration requires pre-existing drivers, sessions, and audit_logs tables with tenant_id; it aborts otherwise. Apply only after provisioning a separate non-owner, non-superuser, non-BYPASSRLS runtime role.
+- Application code does not yet open tenant-scoped DB transactions or prove pool-reset behavior.
+- Fencing tokens are generated but no downstream database/resource rejects stale tokens yet.
+- Session hygiene reports missing Redis TTLs; it does not delete sessions or revoke Keycloak sessions.
+- Authenticator posture report explicitly reports unavailable data until Keycloak Admin API integration exists.
+- Suspicious-enrollment detection requires an actual JSONL audit feed and webhook configuration; the API audit feed is not yet wired.
+- The supervisor module is for local lab use; Compose uses one process per container and restart policies.
+- No claim is made that Docker, Keycloak, PostgreSQL, or a production deployment was executed from this GitHub-only session.
 
-## Not implemented or not verified
-- Flask authentication middleware is not yet wired to set g.authenticated_claims;
-  tenant-protected routes must not be enabled until this integration is complete.
-- PostgreSQL RLS and transaction-scoped tenant binding are not implemented.
-- Fencing tokens are not enforced by a durable downstream resource.
-- Celery Beat is not guarded by this election primitive; do not run multiple Beat
-  instances based on this module alone.
-- Supervisor restart/backoff and shutdown behavior remain unimplemented.
-- Cleanup, posture-audit, and suspicious-enrollment jobs remain unimplemented.
-- No live Redis/PostgreSQL/Keycloak integration or container tests have run here.
-
-## Acceptance gates
-1. Wire verified OIDC claims into Flask request context.
-2. Test PostgreSQL RLS with a non-owner app role: SELECT/INSERT/UPDATE isolation
-   and connection-pool reuse.
-3. Test Redis concurrency, renewal, expiry, ownership-safe release, outages,
-   and stale-leader fencing.
-4. Guard exactly one Beat scheduler and prove failover.
-5. Test supervisor SIGTERM, child exit, bounded restart backoff, and deadlines.
-6. Add idempotency and tenant partitioning tests for each background job.
-7. Run CI, container smoke tests, and the full P0 regression suite.
+## Required acceptance gates
+1. Configure Keycloak protocol mapper and test real introspection responses for one-tenant, multi-tenant, and no-membership identities.
+2. Provision tenant tables and a restricted DB runtime role; test RLS SELECT/INSERT/UPDATE and connection-pool reuse.
+3. Enforce fencing token at the durable downstream write boundary.
+4. Run two scheduler replicas against Redis; test failover, TTL expiry, Redis outage, and no duplicate dispatch.
+5. Add durable audit feed integration and idempotent alert delivery tests.
+6. Integrate Keycloak authenticator inventory and safe session revocation policy.
+7. Run complete P0 regression, CI, Compose smoke, and failure-injection tests.
 
 **PRODUCTION_GATE=CLOSED**
