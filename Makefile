@@ -1,12 +1,28 @@
-.PHONY: install test check compose-config
+PYTHON ?= python3
+COMPOSE := docker compose -f transport_poc/docker-compose.transport.yaml
 
+.PHONY: help install test test-unit test-integration lint security build up down logs health
+help:
+	@printf "%s\n" "SANAD P1 commands" "  make install" "  make test" "  make test-integration" "  make build" "  make up" "  make down" "  make logs" "  make health"
 install:
-	python -m pip install -e ".[dev]"
-
+	$(PYTHON) -m pip install -e ".[dev]"
 test:
-	python -m pytest
-
-check: test
-
-compose-config:
-	docker compose --env-file env.transport -f transport_poc/docker-compose.transport.yaml config
+	$(PYTHON) -m pytest -q
+test-unit:
+	$(PYTHON) -m pytest -q -m "not integration"
+test-integration:
+	REDIS_URL=$${REDIS_URL:-redis://localhost:6379/15} $(PYTHON) -m pytest -q -m integration
+lint:
+	$(PYTHON) -m compileall -q transport_poc
+security:
+	$(PYTHON) -m pip check
+build:
+	$(COMPOSE) build
+up:
+	$(COMPOSE) up -d
+down:
+	$(COMPOSE) down
+logs:
+	$(COMPOSE) logs -f --tail=100
+health:
+	curl -fsS http://127.0.0.1:$${TRANSPORT_API_PORT:-5001}/health
