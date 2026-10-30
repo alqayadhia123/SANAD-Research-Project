@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: sanad-demo
+    env: docker
+    plan: free
+    dockerfilePath: ./transport_poc/driver_wallet_api/Dockerfile
+    dockerContext: ./transport_poc/driver_wallet_api
+    envVars:
+      - key: KEYCLOAK_ISSUER
+        value: http://keycloak-transport:8080/realms/sanad-lab
+      - key: OIDC_CLIENT_ID
+        value: driver-wallet-api
+      - key: EXPECTED_AUDIENCE
+        value: driver-wallet-api
+      - key: REQUIRED_WALLET_SCOPE
+        value: wallet:read
+      # ملاحظة: المتغيرات السرية (مثل OIDC_CLIENT_SECRET) يجب إدخالها من لوحة تحكم Render وليس هنا.
