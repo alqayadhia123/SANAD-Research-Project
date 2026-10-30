@@ -10,8 +10,8 @@ Do not report these capabilities as implemented or experimentally verified.
 
 ## 1. Configure
 
-Copy the repository-root `env.transport.example` to `.env` and replace every
-`CHANGE_ME` / `SET_AFTER` value with unique local secrets. Never commit `.env`.
+Copy `transport_poc/.env.example` to `transport_poc/.env` and replace every
+placeholder with unique local secrets. Never commit `.env`.
 
 Before API access can succeed, configure Keycloak:
 
@@ -32,14 +32,15 @@ test procedure; never paste production tokens into this page.
 From repository root:
 
 ```bash
-docker compose --env-file .env -f transport_poc/docker-compose.transport.yaml config
+docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml config
 docker compose --env-file .env -f transport_poc/docker-compose.transport.yaml up --build -d
 docker compose --env-file .env -f transport_poc/docker-compose.transport.yaml ps
 docker compose --env-file .env -f transport_poc/docker-compose.transport.yaml logs --no-color
 ```
 
 Keycloak is published on host loopback port 8080 and the API on loopback port
-5001. The Docker network is marked internal; this is network isolation, not a
+5001. Compose waits for the Keycloak readiness health check before starting the
+API. The Docker network is marked internal; this is network isolation, not a
 universal guarantee against data exfiltration.
 
 ## 3. API smoke tests
