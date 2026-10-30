@@ -20,7 +20,9 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#07101d;padding:14px;
 <section class="hero"><h1>سند SANAD</h1>
 <p>منصة بحثية لإدارة الهوية ومحفظة السائق. جميع البيانات المعروضة تجريبية ولا تمثل أرصدة أو معاملات حقيقية.</p>
 <div id="authStatus" class="status">لم يتم تسجيل الدخول.</div>
-<button id="loginBtn">تسجيل الدخول وإصدار Access Token</button>
+<button id="loginBtn">تسجيل الدخول</button>
+<button id="adminLoginBtn" class="secondary">تسجيل الدخول الإداري — alqayadhia@gmail.com</button>
+<button id="openBrowserBtn" class="secondary" type="button">فتح SANAD في تبويب المتصفح</button>
 <button id="logoutBtn" class="secondary hidden">إنهاء الجلسة</button>
 </section>
 <section class="panel"><h2>خدمات السائق</h2>
@@ -52,7 +54,8 @@ const b64u=bytes=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,"-").replace
 const randomBytes=n=>crypto.getRandomValues(new Uint8Array(n));
 async function sha256(s){return new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)))}
 function claims(token){try{return JSON.parse(atob(token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")))}catch{return {}}}
-function isAdmin(c){return (c.realm_access?.roles||[]).some(x=>["admin","sanad-admin"].includes(x))||(c.resource_access?.["driver-wallet-api"]?.roles||[]).some(x=>["admin","sanad-admin"].includes(x))}
+function hasAdminRole(c){return (c.realm_access?.roles||[]).some(x=>["admin","sanad-admin"].includes(x))||(c.resource_access?.["driver-wallet-api"]?.roles||[]).some(x=>["admin","sanad-admin"].includes(x))}
+function isAdmin(c){return hasAdminRole(c)&&String(c.email||"").toLowerCase()===String(cfg?.admin_email||"").toLowerCase()&&c.email_verified===true}
 async function init(){
  const r=await fetch("/lab/config",{cache:"no-store"});cfg=await r.json();
  const url=new URL(cfg.issuer+"/.well-known/openid-configuration");
@@ -79,12 +82,13 @@ function updateAuth(){
  $("loginBtn").classList.toggle("hidden",ok);$("logoutBtn").classList.toggle("hidden",!ok);
  $("walletBtn").disabled=!ok;$("routeBtn").disabled=!ok;
  $("adminPanel").classList.toggle("hidden",!ok||!isAdmin(c));
+ $("adminLoginBtn").classList.toggle("hidden",ok&&isAdmin(c));
 }
-async function login(){
+async function login(adminMode=false){
  const verifier=b64u(randomBytes(48)),state=b64u(randomBytes(24)),nonce=b64u(randomBytes(24));
  sessionStorage.setItem("pkce_verifier",verifier);sessionStorage.setItem("oidc_state",state);
  const challenge=b64u(await sha256(verifier));
- const u=new URL(cfg.auth);Object.entries({client_id:cfg.client_id,response_type:"code",scope:cfg.scopes,redirect_uri:cfg.redirect_uri,code_challenge:challenge,code_challenge_method:"S256",state,nonce}).forEach(([k,v])=>u.searchParams.set(k,v));
+ const u=new URL(cfg.auth);Object.entries({client_id:cfg.client_id,response_type:"code",scope:cfg.scopes,redirect_uri:cfg.redirect_uri,code_challenge:challenge,code_challenge_method:"S256",state,nonce,...(adminMode?{prompt:"login",login_hint:cfg.admin_email}:{})}).forEach(([k,v])=>u.searchParams.set(k,v));
  location.assign(u.toString());
 }
 async function api(path,opts={}){
@@ -95,7 +99,9 @@ async function api(path,opts={}){
  if(res.status===401){accessToken=null;sessionStorage.removeItem("sanad_access_token");updateAuth()}
  return body;
 }
-$("loginBtn").onclick=login;
+$("loginBtn").onclick=()=>login(false);
+$("adminLoginBtn").onclick=()=>login(true);
+$("openBrowserBtn").onclick=()=>window.open(window.location.origin+"/","_blank","noopener,noreferrer");
 $("logoutBtn").onclick=()=>{accessToken=null;sessionStorage.removeItem("sanad_access_token");updateAuth();location.assign(cfg.endSession+"?client_id="+encodeURIComponent(cfg.client_id)+"&post_logout_redirect_uri="+encodeURIComponent(location.origin+"/"))};
 $("walletBtn").onclick=()=>api("/api/driver/wallet");
 $("routeBtn").onclick=()=>api("/api/driver/route");
