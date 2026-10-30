@@ -40,15 +40,15 @@ A green workflow badge is not a substitute for the underlying run, job, and rele
 
 | Evidence ID | Scenario / scope | Evidence class | Status | Required artifact |
 |---|---|---|---|---|
-| EV-CI-UNIT-001 | Flask mocked authorization suite | CI_UNIT | Await current run record | Actions job log + test summary |
-| EV-CI-CONT-001 | Compose config and API image smoke test | CI_CONTAINER | Await current run record | Actions job log |
-| EV-CI-LIVE-001 | Keycloak/PostgreSQL/API live integration | CI_LIVE_IDP | In progress / verify run | Full job log + assertion output |
+| EV-CI-UNIT-001 | Flask mocked authorization suite and synthetic fixture validation | CI_UNIT | PASS — 30 tests, 0.15s; fixtures validated (3 drivers, 3 wallets, 3 routes, 3 events, 7 scenarios) | [Run 41106490585](https://github.com/alqayadhia123/SANAD-Research-Project/actions/runs/41106490585), SHA `3f0fa8a883d644c14d9c71d69511e34020646bc7` |
+| EV-CI-CONT-001 | Compose config, Flask image build, API `/health` smoke test | CI_CONTAINER | PASS — image built and health returned `status=ok` | [Run 41106490437](https://github.com/alqayadhia123/SANAD-Research-Project/actions/runs/41106490437), SHA `3f0fa8a883d644c14d9c71d69511e34020646bc7` |
+| EV-CI-LIVE-001 | Keycloak/PostgreSQL/API live integration (service client) | CI_LIVE_IDP | IN_PROGRESS at last observation; no PASS claim | [Run 41106490480](https://github.com/alqayadhia123/SANAD-Research-Project/actions/runs/41106490480), SHA `3f0fa8a883d644c14d9c71d69511e34020646bc7`; capture completed job log before changing status |
 | EV-MAN-REV-001 | Revocation propagation timing | MANUAL_SECURITY | NOT_RUN | timestamped repeated request log |
 | EV-MAN-WA-001 | WebAuthn registration/assertion/replay | MANUAL_SECURITY | BLOCKED | Requires real WebAuthn implementation |
 | EV-MAN-REC-001 | Secure account recovery | MANUAL_SECURITY | BLOCKED | Requires recovery protocol implementation |
 | EV-MAN-TXN-001 | Transaction-bound independent approval | MANUAL_SECURITY | BLOCKED | Requires transaction authorization implementation |
 
-Update statuses only from captured evidence. BLOCKED is not a failure rate and must not be included in denominators for efficacy calculations.
+Evidence snapshot: 2026-10-30 18:24 UTC. These CI results apply only to SHA `3f0fa8a883d644c14d9c71d69511e34020646bc7`; they do not validate later commits. Update statuses only from captured evidence. BLOCKED is not a failure rate and must not be included in denominators for efficacy calculations.
 
 ## 5. Research reporting rules
 
