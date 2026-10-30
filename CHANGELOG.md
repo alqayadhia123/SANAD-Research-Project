@@ -1,18 +1,19 @@
 # Changelog
 
-All notable changes to this research proof of concept are documented here.
+## Unreleased — P1 remediation
 
-## [Unreleased]
+### Added
+- Verified-Keycloak-claim-based tenant membership enforcement in Flask API.
+- Redis Lua-based lease election with ownership-safe renewal/release and fencing token.
+- Leader-elected periodic task dispatcher; no multi-instance Celery Beat is used.
+- Celery worker, Redis service, and isolated Compose services.
+- Conservative background jobs with explicit reporting when source integrations are absent.
+- PostgreSQL RLS prerequisite migration that aborts if expected tables/columns are absent.
+- Redis-backed integration tests in CI.
 
-### Security and reliability
-- Removed the environment-variable authentication bypass from the driver API. API access now always requires a Bearer token validated through Keycloak introspection.
-- Kept identity-provider failures fail-closed; missing client credentials or an unavailable introspection endpoint do not grant access.
-- Added automated tests for missing credentials, inactive tokens, and valid introspection responses.
-- Aligned the API container's Gunicorn listener with the port exposed by the Compose lab.
-- Added baseline contribution, security-reporting, and conduct policies.
-
-### Limitations
-- WebAuthn registration and authentication ceremonies are not implemented.
-- Wallet and route responses contain synthetic demonstration data only; no real funds, payment processing, or financial ledger are connected.
-- The Compose Keycloak service uses `start-dev` and is for an isolated local research lab only.
-- No production readiness, penetration-test result, security certification, or end-to-end deployment validation is claimed.
+### Security and operational limitations
+- Keycloak must emit a verified tenant_id or tenants claim through an approved protocol mapper.
+- PostgreSQL persistence is not connected to the current synthetic wallet API; do not apply RLS migration before schema/role provisioning.
+- Fencing tokens are not yet enforced by a durable downstream resource.
+- Session cleanup, authenticator posture collection, and audit ingestion require real source integrations.
+- Production gate remains closed pending live integration and deployment evidence.
