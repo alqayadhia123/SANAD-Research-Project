@@ -105,8 +105,7 @@ def create_app(test_config=None):
     @app.get("/api/driver/route")
     @require_tenant
     def get_route():
-        token_data, failure = authorized_subject()
-        if failure: return failure
+        token_data = g.authenticated_claims
         return jsonify(status="success",
             driver=token_data.get("preferred_username", token_data.get("sub", "synthetic-driver")),
             route_id="RT-LAB-0001", pickup="Synthetic pickup location",
