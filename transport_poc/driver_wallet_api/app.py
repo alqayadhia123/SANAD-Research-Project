@@ -26,6 +26,7 @@ def create_app(test_config=None):
         REQUIRED_WALLET_SCOPE=os.getenv("REQUIRED_WALLET_SCOPE", "wallet:read"),
         HTTP_TIMEOUT_SECONDS=float(os.getenv("HTTP_TIMEOUT_SECONDS", "3")),
         INTROSPECTION_URL=os.getenv("INTROSPECTION_URL", ""),
+        MAX_CONTENT_LENGTH=16 * 1024,
     )
     if test_config:
         app.config.update(test_config)
@@ -86,9 +87,10 @@ def create_app(test_config=None):
 
     def require_wallet_access():
         header = request.headers.get("Authorization", "")
-        if not header.startswith("Bearer ") or not header[7:].strip():
+        scheme, separator, value = header.partition(" ")
+        if not separator or scheme.lower() != "bearer" or not value.strip():
             return None, (jsonify(error="bearer_token_required"), 401)
-        token = header[7:].strip()
+        token = value.strip()
         if len(token) > 8192:
             return None, (jsonify(error="bearer_token_too_large"), 401)
         claims, error = introspect(token)
@@ -115,8 +117,16 @@ def create_app(test_config=None):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-        if request.path.startswith("/api/"):
-            response.headers["Cache-Control"] = "no-store"
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+            "connect-src 'self'; frame-ancestors 'none'",
+        )
+        response.headers.setdefault(
+            "Cache-Control",
+            "no-store" if request.path.startswith("/api/") else "no-cache",
+        )
         return response
 
     @app.get("/health")
@@ -127,6 +137,15 @@ def create_app(test_config=None):
     @app.get("/")
     def index():
         return render_template("index.html")
+
+    @app.get("/lab/ready")
+    def lab_ready():
+        return jsonify(
+            client_id=app.config["OIDC_CLIENT_ID"],
+            expected_audience=app.config["EXPECTED_AUDIENCE"],
+            client_secret_configured=bool(app.config["OIDC_CLIENT_SECRET"]),
+            note="Configuration presence only; not evidence of Keycloak connectivity or security efficacy.",
+        ), 200
 
     @app.get("/api/driver/wallet")
     def wallet():
@@ -156,6 +175,9 @@ def create_app(test_config=None):
 
     @app.post("/api/driver/enroll-authenticator")
     def enrollment_not_implemented():
+        claims, failure = require_wallet_access()
+        if failure:
+            return failure
         return jsonify(
             error="not_implemented",
             message="Authenticator enrollment is not implemented; no enrollment was performed.",
