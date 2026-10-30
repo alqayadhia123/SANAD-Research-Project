@@ -53,42 +53,36 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          DISCOVERY_URL="http://127.0.0.1:18080/realms/master/.well-known/openid-configuration"
-          DISCOVERY_FILE="/tmp/sanad-keycloak-discovery.json"
-          LAST_STATUS="no-response"
-
-          # Probe the OIDC endpoint that the integration actually depends on;
-          # the Keycloak root path is not a reliable readiness contract.
-          for attempt in $(seq 1 60); do
-            LAST_STATUS=$(curl --silent --show-error --connect-timeout 2 --max-time 3 \
-              --output "$DISCOVERY_FILE" --write-out '%{http_code}' \
-              "$DISCOVERY_URL" 2>/dev/null || true)
-
-            if [[ "$LAST_STATUS" == "200" ]] && python - "$DISCOVERY_FILE" <<'PY'
+          # The Compose network is intentionally internal. Probe Keycloak from
+          # the API container on that network instead of relying on host-published
+          # ports, which are not reachable in this isolated runner topology.
+          docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml exec -T driver-api python - <<'PY'
           import json
-          import sys
-          with open(sys.argv[1], encoding="utf-8") as handle:
-              discovery = json.load(handle)
-          required = ("issuer", "token_endpoint", "token_introspection_endpoint")
-          if not all(isinstance(discovery.get(key), str) and discovery[key] for key in required):
-              raise SystemExit("OIDC discovery document is missing required endpoints")
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import urlopen
+
+          url = "http://keycloak-transport:8080/realms/master/.well-known/openid-configuration"
+          last_error = "no response"
+          for attempt in range(1, 61):
+              try:
+                  with urlopen(url, timeout=3) as response:
+                      if response.status != 200:
+                          raise RuntimeError(f"HTTP {response.status}")
+                      metadata = json.loads(response.read(1024 * 1024))
+                  required = ("issuer", "token_endpoint", "token_introspection_endpoint")
+                  if not all(isinstance(metadata.get(key), str) and metadata[key] for key in required):
+                      raise RuntimeError("OIDC discovery metadata is missing required fields")
+                  print(f"Keycloak OIDC discovery ready over Compose network (attempt {attempt})")
+                  break
+              except (HTTPError, URLError, TimeoutError, OSError, ValueError, RuntimeError) as exc:
+                  last_error = str(exc)
+                  if attempt % 12 == 0:
+                      print(f"OIDC discovery not ready (attempt {attempt}/60): {last_error}")
+                  time.sleep(5)
+          else:
+              raise SystemExit(f"Keycloak OIDC discovery did not become ready: {last_error}")
           PY
-            then
-              echo "Keycloak OIDC discovery is ready (HTTP 200, attempt $attempt)"
-              exit 0
-            fi
-
-            if (( attempt % 12 == 0 )); then
-              echo "Keycloak OIDC discovery not ready (attempt $attempt/60, HTTP $LAST_STATUS)"
-              docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml ps --all
-            fi
-            sleep 5
-          done
-
-          echo "Keycloak OIDC discovery did not become ready; last HTTP status: $LAST_STATUS"
-          docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml ps
-          docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml logs --no-color --tail=150 keycloak-transport postgres-transport
-          exit 1
 
       - name: Configure disposable realm, client, scope, and test user
         shell: bash
@@ -133,55 +127,83 @@ jobs:
       - name: Wait for SANAD API
         shell: bash
         run: |
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:15001/health >/dev/null; then
-              exit 0
-            fi
-            sleep 2
-          done
-          docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml logs --no-color driver-api
-          exit 1
+          set -euo pipefail
+          docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml exec -T driver-api python - <<'PY'
+          import time
+          from urllib.request import urlopen
+
+          for attempt in range(1, 31):
+              try:
+                  with urlopen("http://127.0.0.1:5001/health", timeout=2) as response:
+                      if response.status == 200:
+                          print(f"SANAD API health check passed (attempt {attempt})")
+                          break
+              except Exception:
+                  time.sleep(2)
+          else:
+              raise SystemExit("SANAD API health check did not become ready")
+          PY
 
       - name: Verify real token introspection and authorization decisions
         shell: bash
         run: |
           set -euo pipefail
-          TOKEN_URL="http://127.0.0.1:18080/realms/sanad-lab/protocol/openid-connect/token"
-          CLIENT_SECRET="ci-only-client-secret"
-          USER_PASSWORD="ci-only-user-password"
+          docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml exec -T driver-api python - <<'PY'
+          import json
+          from urllib.error import HTTPError
+          from urllib.parse import urlencode
+          from urllib.request import Request, urlopen
 
-          NO_SCOPE_TOKEN=$(curl --fail --silent "$TOKEN_URL" \
-            -d grant_type=password -d client_id=driver-wallet-api \
-            -d client_secret="$CLIENT_SECRET" -d username=sanad-ci-user \
-            -d password="$USER_PASSWORD" | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+          base = "http://127.0.0.1:5001"
+          token_url = "http://keycloak-transport:8080/realms/sanad-lab/protocol/openid-connect/token"
+          client_id = "driver-wallet-api"
+          client_secret = "ci-only-client-secret"
+          password = "ci-only-user-password"
 
-          VALID_TOKEN=$(curl --fail --silent "$TOKEN_URL" \
-            -d grant_type=password -d client_id=driver-wallet-api \
-            -d client_secret="$CLIENT_SECRET" -d username=sanad-ci-user \
-            -d password="$USER_PASSWORD" -d 'scope=openid wallet:read' | \
-            python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+          def issue_token(scope=None):
+              fields = {
+                  "grant_type": "password",
+                  "client_id": client_id,
+                  "client_secret": client_secret,
+                  "username": "sanad-ci-user",
+                  "password": password,
+              }
+              if scope:
+                  fields["scope"] = scope
+              request = Request(token_url, data=urlencode(fields).encode(), method="POST")
+              with urlopen(request, timeout=8) as response:
+                  return json.loads(response.read())["access_token"]
 
-          MISSING_STATUS=$(curl --silent --output /tmp/missing.json --write-out '%{http_code}' \
-            http://127.0.0.1:15001/api/driver/wallet)
-          test "$MISSING_STATUS" = "401"
+          def api_status(token=None):
+              headers = {}
+              if token is not None:
+                  headers["Authorization"] = f"Bearer {token}"
+              request = Request(f"{base}/api/driver/wallet", headers=headers)
+              try:
+                  with urlopen(request, timeout=8) as response:
+                      return response.status, json.loads(response.read())
+              except HTTPError as exc:
+                  return exc.code, json.loads(exc.read() or b"{}")
 
-          DENIED_STATUS=$(curl --silent --output /tmp/denied.json --write-out '%{http_code}' \
-            http://127.0.0.1:15001/api/driver/wallet \
-            -H "Authorization: Bearer $NO_SCOPE_TOKEN")
-          test "$DENIED_STATUS" = "403"
+          no_scope_token = issue_token()
+          valid_token = issue_token("openid wallet:read")
 
-          VALID_STATUS=$(curl --silent --output /tmp/valid.json --write-out '%{http_code}' \
-            http://127.0.0.1:15001/api/driver/wallet \
-            -H "Authorization: Bearer $VALID_TOKEN")
-          test "$VALID_STATUS" = "200"
-          python -c 'import json; d=json.load(open("/tmp/valid.json")); assert d["synthetic_data"] is True; assert d["status"] == "success"'
+          missing_status, _ = api_status()
+          assert missing_status == 401, f"missing token expected 401, got {missing_status}"
 
-          INVALID_STATUS=$(curl --silent --output /tmp/invalid.json --write-out '%{http_code}' \
-            http://127.0.0.1:15001/api/driver/wallet \
-            -H "Authorization: Bearer definitely-not-a-real-token")
-          test "$INVALID_STATUS" = "401"
+          denied_status, _ = api_status(no_scope_token)
+          assert denied_status == 403, f"insufficient scope expected 403, got {denied_status}"
 
-          echo "Live Keycloak introspection integration passed: missing=401 insufficient_scope=403 valid=200 invalid=401"
+          valid_status, valid_body = api_status(valid_token)
+          assert valid_status == 200, f"valid token expected 200, got {valid_status}"
+          assert valid_body.get("synthetic_data") is True
+          assert valid_body.get("status") == "success"
+
+          invalid_status, _ = api_status("definitely-not-a-real-token")
+          assert invalid_status == 401, f"invalid token expected 401, got {invalid_status}"
+
+          print("Live Keycloak introspection integration passed: missing=401 insufficient_scope=403 valid=200 invalid=401")
+          PY
 
       - name: Collect service logs on failure
         if: failure()
