@@ -65,7 +65,7 @@ jobs:
           import sys
           with open(sys.argv[1], encoding="utf-8") as handle:
               discovery = json.load(handle)
-          required = ("issuer", "token_endpoint", "introspection_endpoint")
+          required = ("issuer", "token_endpoint", "token_introspection_endpoint")
           if not all(isinstance(discovery.get(key), str) and discovery[key] for key in required):
               raise SystemExit("OIDC discovery document is missing required endpoints")
           PY
@@ -75,7 +75,8 @@ jobs:
             fi
 
             if (( attempt % 12 == 0 )); then
-              echo "Keycloak is not ready yet (attempt $attempt/120, HTTP $LAST_STATUS)"
+              echo "Keycloak OIDC discovery not ready (attempt $attempt/120, HTTP $LAST_STATUS)"
+              docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml ps --all
             fi
             sleep 5
           done
