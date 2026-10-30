@@ -10,7 +10,7 @@ def admin_client(monkeypatch, tmp_path, roles=None):
     claims = {
         "active": True, "sub": "admin-test-001",
         "aud": ["driver-wallet-api"], "scope": "openid wallet:read",
-        "iss": "https://idp.example/realms/sanad-lab",
+        "iss": "https://idp.example/realms/sanad-lab", "tenant_id": "tenant-test-001",
         "realm_access": {"roles": roles or ["sanad-admin"]},
     }
     class Response:

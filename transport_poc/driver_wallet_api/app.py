@@ -30,6 +30,7 @@ def create_app(test_config=None):
         KEYCLOAK_INTERNAL_HOSTPORT=os.getenv("KEYCLOAK_INTERNAL_HOSTPORT", "").strip(),
         MAX_CONTENT_LENGTH=6 * 1024 * 1024,
         PUBLIC_OIDC_CLIENT_ID=os.getenv("PUBLIC_OIDC_CLIENT_ID", "sanad-driver-web"),
+        PUBLIC_OIDC_ISSUER=os.getenv("PUBLIC_OIDC_ISSUER", "http://localhost:8080/realms/sanad-lab").rstrip("/"),
         OIDC_REDIRECT_URI=os.getenv("OIDC_REDIRECT_URI", ""),
         SANAD_DATA_DIR=os.getenv("SANAD_DATA_DIR", "/tmp/sanad-data"),
         SANAD_DATA_ENCRYPTION_KEY=os.getenv("SANAD_DATA_ENCRYPTION_KEY", ""),
@@ -129,7 +130,7 @@ def create_app(test_config=None):
     @app.get("/lab/config")
     def lab_config():
         return jsonify(
-            issuer=app.config["KEYCLOAK_ISSUER"],
+            issuer=app.config["PUBLIC_OIDC_ISSUER"],
             client_id=app.config["PUBLIC_OIDC_CLIENT_ID"],
             redirect_uri=app.config["OIDC_REDIRECT_URI"] or request.url_root.rstrip("/") + "/",
             scopes="openid profile wallet:read",
@@ -156,7 +157,7 @@ def create_app(test_config=None):
             "Content-Security-Policy",
             "default-src 'self'; script-src 'self' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
-            f"connect-src 'self' {urlparse(app.config['KEYCLOAK_ISSUER']).scheme}://{urlparse(app.config['KEYCLOAK_ISSUER']).netloc}; frame-ancestors 'none'",
+            f"connect-src 'self' {urlparse(app.config['PUBLIC_OIDC_ISSUER']).scheme}://{urlparse(app.config['KEYCLOAK_ISSUER']).netloc}; frame-ancestors 'none'",
         )
         response.headers.setdefault(
             "Cache-Control",

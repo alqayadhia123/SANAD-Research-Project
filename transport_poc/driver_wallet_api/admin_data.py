@@ -40,6 +40,7 @@ def _connect(app):
     db.execute("""
         CREATE TABLE IF NOT EXISTS datasets (
             id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
             filename TEXT NOT NULL,
             content_type TEXT NOT NULL,
             row_count INTEGER NOT NULL,
@@ -102,6 +103,9 @@ def register_admin_routes(app, authorize):
         roles.update(resource_roles if isinstance(resource_roles, list) else [])
         if "sanad-admin" not in roles and "admin" not in roles:
             return None, (jsonify(error="admin_role_required"), 403)
+        tenant_id = claims.get("tenant_id")
+        if not isinstance(tenant_id, str) or not tenant_id.strip():
+            return None, (jsonify(error="verified_tenant_claim_required"), 403)
         return claims, None
 
     @app.get("/api/admin/datasets")
@@ -113,7 +117,8 @@ def register_admin_routes(app, authorize):
             with _database(app) as db:
                 rows = db.execute(
                     "SELECT id,filename,content_type,row_count,sha256,uploaded_by,created_at "
-                    "FROM datasets ORDER BY created_at DESC"
+                    "FROM datasets WHERE tenant_id=? ORDER BY created_at DESC",
+                    (claims["tenant_id"],)
                 ).fetchall()
             return jsonify(datasets=[dict(row) for row in rows], synthetic_data=True), 200
         except (OSError, sqlite3.Error):
@@ -154,9 +159,9 @@ def register_admin_routes(app, authorize):
             with _connect(app) as db:
                 db.execute(
                     "INSERT INTO datasets "
-                    "(id,filename,content_type,row_count,sha256,encrypted_payload,uploaded_by,created_at) "
-                    "VALUES (?,?,?,?,?,?,?,?)",
-                    (dataset_id, filename, Path(filename).suffix.lower()[1:],
+                    "(id,tenant_id,filename,content_type,row_count,sha256,encrypted_payload,uploaded_by,created_at) "
+                    "VALUES (?,?,?,?,?,?,?,?,?)",
+                    (dataset_id, claims["tenant_id"], filename, Path(filename).suffix.lower()[1:],
                      len(records), digest, encrypted, subject, created),
                 )
             return jsonify(status="stored_encrypted", id=dataset_id,
@@ -208,9 +213,9 @@ def register_admin_routes(app, authorize):
                     dataset_id = hashlib.sha256(os.urandom(32)).hexdigest()[:24]
                     db.execute(
                         "INSERT INTO datasets "
-                        "(id,filename,content_type,row_count,sha256,encrypted_payload,uploaded_by,created_at) "
-                        "VALUES (?,?,?,?,?,?,?,?)",
-                        (dataset_id, f"sanad-synthetic-{name}.json", "json",
+                        "(id,tenant_id,filename,content_type,row_count,sha256,encrypted_payload,uploaded_by,created_at) "
+                        "VALUES (?,?,?,?,?,?,?,?,?)",
+                        (dataset_id, claims["tenant_id"], f"sanad-synthetic-{name}.json", "json",
                          len(records), hashlib.sha256(canonical).hexdigest(),
                          cipher.encrypt(canonical), claims.get("sub", "unknown"), created),
                     )
@@ -230,7 +235,8 @@ def register_admin_routes(app, authorize):
             cipher = _cipher(app)
             with _connect(app) as db:
                 row = db.execute(
-                    "SELECT encrypted_payload FROM datasets WHERE id=?", (dataset_id,)
+                    "SELECT encrypted_payload FROM datasets WHERE id=? AND tenant_id=?",
+                    (dataset_id, claims["tenant_id"]),
                 ).fetchone()
             if row is None:
                 return jsonify(error="dataset_not_found"), 404
