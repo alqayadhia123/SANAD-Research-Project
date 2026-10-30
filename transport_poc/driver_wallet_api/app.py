@@ -3,7 +3,8 @@ import base64, json, os
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, g, jsonify, render_template, request
+from transport_poc.core.tenancy import init_tenancy, require_tenant
 
 def create_app(test_config=None):
     app = Flask(__name__)
@@ -16,6 +17,7 @@ def create_app(test_config=None):
         MAX_CONTENT_LENGTH=16 * 1024,
     )
     if test_config: app.config.update(test_config)
+    init_tenancy(app)
 
     def introspect(token):
         secret = app.config["OIDC_CLIENT_SECRET"]
@@ -59,6 +61,7 @@ def create_app(test_config=None):
         if error:
             status = 503 if error in {"introspection_not_configured", "introspection_unavailable"} else 401
             return None, (jsonify(error=error, access="denied"), status)
+        g.authenticated_claims = data
         return data, None
 
     @app.after_request
@@ -84,6 +87,7 @@ def create_app(test_config=None):
             note="Configuration presence only; not evidence of Keycloak connectivity or security efficacy.")
 
     @app.get("/api/driver/wallet")
+    @require_tenant
     def get_wallet():
         token_data, failure = authorized_subject()
         if failure: return failure
@@ -93,6 +97,7 @@ def create_app(test_config=None):
             message="Synthetic wallet data; no real funds or financial actions are connected.")
 
     @app.get("/api/driver/route")
+    @require_tenant
     def get_route():
         token_data, failure = authorized_subject()
         if failure: return failure
@@ -102,6 +107,7 @@ def create_app(test_config=None):
             dropoff="Synthetic drop-off location", route_status="active", synthetic_data=True)
 
     @app.post("/api/driver/enroll-authenticator")
+    @require_tenant
     def enroll_authenticator():
         _, failure = authorized_subject()
         if failure: return failure
