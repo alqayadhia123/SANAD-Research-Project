@@ -13,8 +13,9 @@ class FakeResponse:
     def __exit__(self, *args):
         return False
 
-    def read(self):
-        return json.dumps(self.payload).encode("utf-8")
+    def read(self, size=-1):
+        raw = json.dumps(self.payload).encode("utf-8")
+        return raw if size < 0 else raw[:size]
 
 
 def make_client(monkeypatch, payload=None, raises=None):
@@ -135,3 +136,41 @@ def test_enrollment_is_explicitly_not_implemented():
     })
     assert response.status_code == 501
     assert response.get_json()["error"] == "not_implemented"
+
+def test_wallet_rejects_missing_issuer(monkeypatch):
+    payload = active_payload()
+    payload.pop("iss")
+    client = make_client(monkeypatch, payload)
+    response = client.get("/api/driver/wallet",
+                          headers={"Authorization": "Bearer test-token"})
+    assert response.status_code == 401
+
+
+def test_wallet_rejects_non_string_scope(monkeypatch):
+    client = make_client(monkeypatch, active_payload(scope=["wallet:read"]))
+    response = client.get("/api/driver/wallet",
+                          headers={"Authorization": "Bearer test-token"})
+    assert response.status_code == 403
+
+
+def test_wallet_rejects_oversized_bearer_token():
+    client = api.create_app({"TESTING": True}).test_client()
+    response = client.get("/api/driver/wallet",
+                          headers={"Authorization": "Bearer " + ("x" * 8193)})
+    assert response.status_code == 401
+    assert response.get_json()["error"] == "bearer_token_too_large"
+
+
+def test_api_responses_are_not_cached_and_have_security_headers(monkeypatch):
+    client = make_client(monkeypatch, active_payload())
+    response = client.get("/api/driver/wallet",
+                          headers={"Authorization": "Bearer test-token"})
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+
+
+def test_health_has_security_headers():
+    client = api.create_app({"TESTING": True}).test_client()
+    response = client.get("/health")
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
