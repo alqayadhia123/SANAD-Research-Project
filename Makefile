@@ -48,7 +48,7 @@ security:
 	pip-audit
 
 audit-verify:
-	$(PYTHON) -c "from transport_poc.core.audit import AuditLogger; r=AuditLogger().verify_chain(); print(r); raise SystemExit(0 if r['valid'] else 1)"
+	@if test -f transport_poc/core/audit.py; then $(PYTHON) -c 'from transport_poc.core.audit import AuditLogger; r=AuditLogger().verify_chain(); print(r); raise SystemExit(0 if r["valid"] else 1)'; else echo "Audit verification unavailable: core/audit.py is not present in this branch"; exit 2; fi
 
 build:
 	$(COMPOSE) build
