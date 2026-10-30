@@ -84,7 +84,7 @@ jobs:
               raise SystemExit(f"Keycloak OIDC discovery did not become ready: {last_error}")
           PY
 
-      - name: Configure disposable realm, client, scope, and test user
+      - name: Configure disposable realm, confidential service client, and scope
         shell: bash
         run: |
           set -euo pipefail
