@@ -336,3 +336,25 @@ def test_wallet_rejects_token_issued_to_another_client(monkeypatch):
                           headers={"Authorization": "Bearer test-token"})
     assert response.status_code == 401
     assert response.get_json()["error"] == "client_mismatch"
+
+
+def test_vishing_simulation_token_is_rejected_by_inactive_introspection(monkeypatch):
+    client = make_client(monkeypatch, active_payload(active=False))
+    response = client.get(
+        "/api/driver/wallet",
+        headers={
+            "Authorization": "Bearer SANAD-VISHING-SIMULATION.INVALID.TOKEN"
+        },
+    )
+    assert response.status_code == 401
+    assert response.get_json()["error"] == "inactive_token"
+
+
+def test_vishing_simulation_ui_is_present_and_explains_503():
+    client = api.create_app({"TESTING": True}).test_client()
+    response = client.get("/")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'id="vishingBtn"' in html
+    assert "SANAD-VISHING-SIMULATION.INVALID.TOKEN" in html
+    assert "لا يُعد دليلاً على أن الرمز رُفض" in html
