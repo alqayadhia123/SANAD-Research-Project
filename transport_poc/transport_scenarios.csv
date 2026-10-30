@@ -1,0 +1,7 @@
+test_id,scenario,preconditions,procedure,expected_result,actual_result,status,evidence_ref
+T1,Authorized API access,Active token with correct issuer audience and wallet:read scope,Request wallet endpoint,HTTP 200 with synthetic data,,NOT RUN,
+T2,Unauthorized authenticator enrollment,Enrollment implementation absent,Attempt enrollment endpoint,HTTP 501 until secure workflow is implemented,,NOT RUN,
+T3,Expired or inactive token,IdP test token expired or inactive,Call protected endpoint,HTTP 401,,NOT RUN,
+T4,Audience mismatch,Active token audience excludes driver-wallet-api,Call protected endpoint,HTTP 401,,NOT RUN,
+T5,Revoked session,Token/session revoked at IdP and introspection reflects inactive state,Call protected endpoint,HTTP 401 after IdP state transition,,NOT RUN,
+T6,WebAuthn assertion replay,Requires actual WebAuthn ceremony and server-side challenge store,Replay a consumed assertion/challenge,Rejected by verified challenge lifecycle,,BLOCKED,
