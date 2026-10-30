@@ -38,7 +38,7 @@ services:
 
   driver-api:
     build:
-      context: ./transport_poc/driver_wallet_api
+      context: ./driver_wallet_api
     restart: unless-stopped
     depends_on:
       - keycloak-transport
