@@ -13,9 +13,11 @@ test-unit:
 test-integration:
 	REDIS_URL=$${REDIS_URL:-redis://localhost:6379/15} $(PYTHON) -m pytest -q -m integration
 lint:
-	$(PYTHON) -m compileall -q transport_poc
+	ruff check transport_poc
+	ruff format --check transport_poc
 security:
-	$(PYTHON) -m pip check
+	bandit -r transport_poc -ll
+	pip-audit
 build:
 	$(COMPOSE) build
 up:
