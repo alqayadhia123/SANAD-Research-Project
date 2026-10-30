@@ -1,6 +1,6 @@
 # SANAD — Secure Identity & Mobility Trust
 
-**Project owner / maintainer:** [Aboraed Alqayadhi](https://github.com/alqayadhia123)  
+**Maintainer:** [@alqayadhia123](https://github.com/alqayadhia123)  
 **GitHub account:** [@alqayadhia123](https://github.com/alqayadhia123)  
 **Repository:** [alqayadhia123/SANAD-Research-Project](https://github.com/alqayadhia123/SANAD-Research-Project)
 
