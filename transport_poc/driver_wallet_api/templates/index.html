@@ -1,85 +1,62 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#0f172a">
-  <title>سند | تطبيق السائق - بيئة بحثية</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>سند | بيئة اختبار بحثية</title>
   <style>
-    * { box-sizing: border-box; font-family: "Segoe UI", Tahoma, sans-serif; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 20px; color: #f8fafc; background: #0f172a; }
-    main { width: min(100%, 460px); padding: 28px; border-radius: 22px; background: #1e293b; box-shadow: 0 20px 50px #0006; }
-    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 22px; }
-    h1 { margin: 0; color: #38bdf8; font-size: 26px; }
-    .tag { padding: 6px 10px; border-radius: 99px; background: #334155; color: #cbd5e1; font-size: 11px; }
-    .notice { padding: 12px; margin-bottom: 18px; border-radius: 12px; background: #422006; color: #fde68a; line-height: 1.7; font-size: 13px; }
-    .card { padding: 22px; border-radius: 18px; margin-bottom: 18px; background: linear-gradient(135deg, #0284c7, #2563eb); }
-    .muted { color: #cbd5e1; font-size: 13px; }
-    #driverName { margin: 8px 0 20px; font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
-    #walletBalance { font-size: 36px; font-weight: 800; }
-    .row { display: flex; justify-content: space-between; gap: 12px; padding: 13px; margin: 9px 0; border-radius: 10px; background: #334155; }
-    button { width: 100%; border: 0; border-radius: 10px; padding: 14px; margin-top: 10px; font-size: 15px; font-weight: 700; cursor: pointer; }
-    button:disabled { opacity: .55; cursor: wait; }
-    #refresh { background: #38bdf8; color: #082f49; }
-    #attack { background: #7f1d1d; color: #fee2e2; }
-    #statusMessage { min-height: 24px; margin: 14px 0 0; line-height: 1.6; font-size: 13px; }
-    footer { margin-top: 18px; text-align: center; color: #94a3b8; font-size: 11px; }
+    :root { color-scheme: dark; }
+    body { margin:0; min-height:100vh; display:grid; place-items:center; padding:20px;
+      background:#0f172a; color:#e2e8f0; font-family:Tahoma,Arial,sans-serif; }
+    main { width:min(560px,100%); box-sizing:border-box; padding:28px; border-radius:18px;
+      background:#1e293b; border:1px solid #334155; }
+    h1 { margin-top:0; color:#7dd3fc; }
+    .notice { padding:12px; background:#422006; border-right:4px solid #f59e0b;
+      border-radius:8px; line-height:1.7; }
+    label { display:block; margin:18px 0 7px; }
+    input { width:100%; box-sizing:border-box; padding:12px; border-radius:8px;
+      border:1px solid #64748b; background:#0f172a; color:white; }
+    button { margin-top:12px; padding:12px 18px; border:0; border-radius:8px;
+      background:#38bdf8; color:#082f49; font-weight:bold; cursor:pointer; }
+    pre { white-space:pre-wrap; overflow-wrap:anywhere; background:#020617;
+      padding:14px; border-radius:8px; min-height:70px; }
+    small { color:#94a3b8; line-height:1.7; }
   </style>
 </head>
 <body>
 <main>
-  <header><h1>سند</h1><span class="tag">Research PoC</span></header>
-  <div class="notice">هذه بيئة اختبار ببيانات اصطناعية. المصادقة تعتمد فحص رمز OIDC عبر Keycloak؛ لا يعني ذلك أن WebAuthn مفعّل أو أن التطبيق صالح للإنتاج.</div>
-  <section class="card" aria-live="polite">
-    <div class="muted">السائق المعتمد</div>
-    <div id="driverName">بانتظار المصادقة</div>
-    <div class="muted">رصيد المحفظة التجريبي</div>
-    <div id="walletBalance">—</div>
-    <div class="muted">ريال سعودي (SAR) · بيانات اصطناعية</div>
-  </section>
-  <div class="row"><span class="muted">حالة المصادقة</span><strong id="authStatus">غير متصل</strong></div>
-  <div class="row"><span class="muted">آخر تحقق</span><strong id="lastCheck">—</strong></div>
-  <button id="refresh" type="button">التحقق من المحفظة</button>
-  <button id="attack" type="button">محاكاة محاولة Vishing (عرض توضيحي)</button>
-  <p id="statusMessage" role="status" aria-live="polite"></p>
-  <footer>لا تستخدم بيانات أو أرصدة حقيقية في هذه النسخة.</footer>
+  <h1>سند SANAD</h1>
+  <p class="notice">واجهة اختبار API فقط. لا تنفذ WebAuthn ولا تثبت مقاومة Vishing.
+    أدخل رمز اختبار صادرًا من مزود الهوية؛ لا تستخدم رمزًا إنتاجيًا.</p>
+  <label for="token">Access Token للاختبار</label>
+  <input id="token" type="password" autocomplete="off" spellcheck="false"
+         placeholder="Bearer token — لا تحفظه في المتصفح">
+  <button id="walletBtn" type="button">طلب بيانات المحفظة الاصطناعية</button>
+  <button id="healthBtn" type="button">فحص الخدمة</button>
+  <h2>استجابة الخادم</h2>
+  <pre id="output" aria-live="polite">لم يُرسل أي طلب بعد.</pre>
+  <small>لا تُخزن الواجهة الرمز في Local Storage أو Cookies. استخدم بيئة محلية معزولة
+    ورموز اختبار قصيرة العمر. بيانات المحفظة المعروضة اصطناعية بالكامل.</small>
 </main>
 <script>
-  const byId = (id) => document.getElementById(id);
-  const refreshButton = byId("refresh");
-  async function fetchWallet() {
-    const token = window.prompt("ألصق Access Token صادرًا من Keycloak لبيئة الاختبار:");
-    if (!token || !token.trim()) { byId("statusMessage").textContent = "تم إلغاء العملية."; return; }
-    refreshButton.disabled = true;
-    byId("authStatus").textContent = "جارٍ التحقق…";
-    byId("statusMessage").textContent = "";
+  const output = document.getElementById("output");
+  async function callApi(path, withToken) {
+    output.textContent = "جارٍ إرسال الطلب...";
+    const headers = {};
+    const token = document.getElementById("token").value.trim();
+    if (withToken && token) headers.Authorization = `Bearer ${token}`;
     try {
-      const response = await fetch("/api/driver/wallet", {
-        method: "GET",
-        headers: { "Authorization": "Bearer " + token.trim(), "Accept": "application/json" },
-        cache: "no-store"
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || ("HTTP " + response.status));
-      byId("driverName").textContent = data.driver || "سائق تجريبي";
-      byId("walletBalance").textContent = Number(data.wallet_balance).toFixed(2);
-      byId("authStatus").textContent = "تم التحقق";
-      byId("lastCheck").textContent = new Date().toLocaleTimeString("ar-SA");
-      byId("statusMessage").textContent = "نجح فحص الرمز. البيانات المعروضة اصطناعية فقط.";
+      const response = await fetch(path, { method: "GET", headers, cache: "no-store" });
+      const body = await response.text();
+      output.textContent = `HTTP ${response.status}\n${body}`;
     } catch (error) {
-      byId("driverName").textContent = "غير مصرح";
-      byId("walletBalance").textContent = "🔒";
-      byId("authStatus").textContent = "مرفوض";
-      byId("statusMessage").textContent = "تعذر الوصول: " + error.message;
-    } finally { refreshButton.disabled = false; }
+      output.textContent = `Network error: ${String(error)}`;
+    }
   }
-  refreshButton.addEventListener("click", fetchWallet);
-  byId("attack").addEventListener("click", () => {
-    byId("driverName").textContent = "محاكاة فقط";
-    byId("walletBalance").textContent = "🔒";
-    byId("authStatus").textContent = "حدث توضيحي";
-    byId("statusMessage").textContent = "محاكاة توعوية لهجوم انتحال صوتي. لم يُرسل طلب تغيير مفاتيح ولم يُنفذ اختبار WebAuthn فعلي.";
-  });
+  document.getElementById("walletBtn").addEventListener("click",
+    () => callApi("/api/driver/wallet", true));
+  document.getElementById("healthBtn").addEventListener("click",
+    () => callApi("/health", false));
 </script>
 </body>
 </html>
