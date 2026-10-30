@@ -4,6 +4,7 @@ services:
     runtime: docker
     plan: free
     rootDir: transport_poc/driver_wallet_api
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: transport_poc/driver_wallet_api/Dockerfile
+    dockerContext: transport_poc/driver_wallet_api
     healthCheckPath: /health
-    autoDeploy: true
+    autoDeployTrigger: commit
