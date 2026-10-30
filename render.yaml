@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: sanad-demo
+    runtime: docker
+    plan: free
+    rootDir: transport_poc/driver_wallet_api
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
