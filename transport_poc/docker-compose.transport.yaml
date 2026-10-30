@@ -14,7 +14,6 @@ services:
       timeout: 3s
       retries: 20
     networks: [transport_lab]
-
   keycloak-transport:
     image: quay.io/keycloak/keycloak:26.4.2
     command: ["start-dev", "--http-port=8080"]
@@ -33,7 +32,6 @@ services:
     ports:
       - "127.0.0.1:${TRANSPORT_KC_HTTP_PORT:-8180}:8080"
     networks: [transport_lab]
-
   driver-api:
     build:
       context: ./driver_wallet_api
@@ -42,18 +40,17 @@ services:
       keycloak-transport:
         condition: service_started
     environment:
-      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER}
-      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
-      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
-      EXPECTED_AUDIENCE: ${EXPECTED_AUDIENCE}
+      PORT: "5001"
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:?Set KEYCLOAK_ISSUER in env.transport}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?Set OIDC_CLIENT_ID in env.transport}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?Set OIDC_CLIENT_SECRET in env.transport}
+      EXPECTED_AUDIENCE: ${EXPECTED_AUDIENCE:?Set EXPECTED_AUDIENCE in env.transport}
       HTTP_TIMEOUT_SECONDS: ${HTTP_TIMEOUT_SECONDS:-3}
     ports:
       - "127.0.0.1:${TRANSPORT_API_PORT:-5001}:5001"
     networks: [transport_lab]
-
 networks:
   transport_lab:
     internal: true
-
 volumes:
   transport_postgres_data:

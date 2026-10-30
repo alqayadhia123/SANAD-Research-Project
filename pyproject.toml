@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sanad-driver-wallet-poc"
+version = "0.2.0"
+description = "Research proof of concept for driver identity protection using Keycloak and OIDC"
+requires-python = ">=3.10"
+dependencies = [
+  "Flask==3.1.2",
+  "gunicorn==23.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["transport_poc/driver_wallet_api"]
+addopts = "-ra"
+
+[tool.setuptools]
+py-modules = []
