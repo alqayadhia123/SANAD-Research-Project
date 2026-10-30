@@ -7,6 +7,12 @@ Use Keycloak as the only OIDC/OAuth2 identity provider. Human administrators mus
 
 Use short-lived access tokens (target 5 minutes for the lab), exact issuer and audience validation, narrow scopes, and server-side introspection. Do not use password grant or implicit flow. Do not store bearer tokens in localStorage, source control, logs, or audit records.
 
+## SANAD named administrator identity
+
+The dataset-administration endpoints are additionally bound to the single configured human identity `alqayadhia@gmail.com`. Set `SANAD_ADMIN_EMAIL=alqayadhia@gmail.com` in the API service environment (the code default is the same address). The Keycloak introspection response must include `email` and the boolean claim `email_verified: true`; it must also include the `sanad-admin` realm role (or approved `admin` role) and a non-empty `tenant_id`. The server checks all of these claims on every admin dataset request. A Keycloak `login_hint` is only a convenience and is not an authorization control.
+
+The page provides a dedicated administrator sign-in action that requests an interactive Keycloak login with the configured email hint. Keycloak, not SANAD JavaScript, issues the access token through Authorization Code + PKCE. There is no manual JWT/token minting endpoint. The browser UI's decoded claims are display-only; server-side introspection remains authoritative. If the Keycloak introspection profile does not return a verified email claim, administrative dataset access is denied until the realm/client mapper is correctly configured.
+
 ## Bootstrap
 Set the bootstrap username to sanad-admin in the private hosting secret store. Generate a unique random password of at least 32 characters with a password manager and set it only in the private secret store. Never commit or share it in chat. Sign in once, enroll MFA, create named administrator accounts and the sanad-admin role, verify recovery access, then disable or rotate the bootstrap account.
 
