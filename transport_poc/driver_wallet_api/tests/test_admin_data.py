@@ -25,6 +25,7 @@ def admin_client(monkeypatch, tmp_path, roles=None):
         "EXPECTED_AUDIENCE": "driver-wallet-api",
         "REQUIRED_WALLET_SCOPE": "wallet:read",
         "KEYCLOAK_ISSUER": "https://idp.example/realms/sanad-lab",
+        "ADMIN_EMAIL": "other-admin@example.com",
         "SANAD_DATA_DIR": str(tmp_path),
         "SANAD_DATA_ENCRYPTION_KEY": Fernet.generate_key().decode(),
     }).test_client()
