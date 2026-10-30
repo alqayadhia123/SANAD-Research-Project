@@ -12,6 +12,7 @@ on:
   push:
     branches:
       - "fix/sanad-p0-security-baseline"
+      - "feature/admin-token-data-management"
 
 permissions:
   contents: read
@@ -34,6 +35,8 @@ jobs:
       - name: Compile Python sources
         run: |
           python -m py_compile transport_poc/driver_wallet_api/app.py
+          python -m py_compile transport_poc/driver_wallet_api/admin_data.py
+          python -m py_compile transport_poc/driver_wallet_api/tests/test_admin_data.py
           python -m py_compile transport_poc/driver_wallet_api/tests/conftest.py
           python -m py_compile transport_poc/driver_wallet_api/tests/test_app.py
       - name: Validate synthetic test data

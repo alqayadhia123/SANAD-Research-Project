@@ -1,62 +1,145 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>سند | بيئة اختبار بحثية</title>
-  <style>
-    :root { color-scheme: dark; }
-    body { margin:0; min-height:100vh; display:grid; place-items:center; padding:20px;
-      background:#0f172a; color:#e2e8f0; font-family:Tahoma,Arial,sans-serif; }
-    main { width:min(560px,100%); box-sizing:border-box; padding:28px; border-radius:18px;
-      background:#1e293b; border:1px solid #334155; }
-    h1 { margin-top:0; color:#7dd3fc; }
-    .notice { padding:12px; background:#422006; border-right:4px solid #f59e0b;
-      border-radius:8px; line-height:1.7; }
-    label { display:block; margin:18px 0 7px; }
-    input { width:100%; box-sizing:border-box; padding:12px; border-radius:8px;
-      border:1px solid #64748b; background:#0f172a; color:white; }
-    button { margin-top:12px; padding:12px 18px; border:0; border-radius:8px;
-      background:#38bdf8; color:#082f49; font-weight:bold; cursor:pointer; }
-    pre { white-space:pre-wrap; overflow-wrap:anywhere; background:#020617;
-      padding:14px; border-radius:8px; min-height:70px; }
-    small { color:#94a3b8; line-height:1.7; }
-  </style>
-</head>
-<body>
-<main>
-  <h1>سند SANAD</h1>
-  <p class="notice">واجهة اختبار API فقط. لا تنفذ WebAuthn ولا تثبت مقاومة Vishing.
-    أدخل رمز اختبار صادرًا من مزود الهوية؛ لا تستخدم رمزًا إنتاجيًا.</p>
-  <label for="token">Access Token للاختبار</label>
-  <input id="token" type="password" autocomplete="off" spellcheck="false"
-         placeholder="Bearer token — لا تحفظه في المتصفح">
-  <button id="walletBtn" type="button">طلب بيانات المحفظة الاصطناعية</button>
-  <button id="healthBtn" type="button">فحص الخدمة</button>
-  <h2>استجابة الخادم</h2>
-  <pre id="output" aria-live="polite">لم يُرسل أي طلب بعد.</pre>
-  <small>لا تُخزن الواجهة الرمز في Local Storage أو Cookies. استخدم بيئة محلية معزولة
-    ورموز اختبار قصيرة العمر. بيانات المحفظة المعروضة اصطناعية بالكامل.</small>
-</main>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>سند SANAD | هوية ومحفظة السائق</title>
+<style>
+:root{color-scheme:dark;font-family:Tahoma,Arial,sans-serif}*{box-sizing:border-box}
+body{margin:0;background:#0b1220;color:#e5edf7;padding:22px}
+main{max-width:980px;margin:auto}.hero,.panel{background:#131f32;border:1px solid #2b3c55;border-radius:16px;padding:22px;margin-bottom:16px}
+h1{color:#7dd3fc;margin-top:0}h2{font-size:19px;color:#bae6fd}
+p,small{line-height:1.8;color:#b8c6d9}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+button,.filebtn{border:0;border-radius:9px;padding:11px 15px;background:#38bdf8;color:#082f49;font-weight:bold;cursor:pointer;margin:5px 0}button:focus-visible{outline:3px solid #facc15;outline-offset:2px}.quickLinks{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.quickLinks button{background:#26364d;color:#e2e8f0}
+button.secondary{background:#334155;color:#e2e8f0}button.danger{background:#b45309;color:white}
+input{max-width:100%;padding:10px;background:#0b1220;color:white;border:1px solid #52647e;border-radius:8px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#07101d;padding:14px;border-radius:9px;min-height:70px;max-height:420px;overflow:auto}
+.status{padding:10px;border-radius:8px;background:#422006;color:#fde68a}
+.hidden{display:none}.muted{font-size:12px;color:#94a3b8}
+</style></head>
+<body><main>
+<section class="hero"><h1>سند SANAD</h1>
+<p>منصة بحثية لإدارة الهوية ومحفظة السائق. جميع البيانات المعروضة تجريبية ولا تمثل أرصدة أو معاملات حقيقية.</p>
+<div id="authStatus" class="status">لم يتم تسجيل الدخول.</div>
+<button id="loginBtn">تسجيل الدخول</button>
+<button id="adminLoginBtn" class="secondary" type="button">تسجيل الدخول الإداري</button>
+<button id="openBrowserBtn" class="secondary" type="button">فتح واجهة SANAD</button>\n<div class="quickLinks" aria-label="روابط المشروع والخدمات">\n<button id="projectBtn" type="button">صفحة مشروع SANAD</button>\n<button id="githubBtn" type="button">مستودع GitHub</button>\n<button id="pullRequestBtn" type="button">مراجعة التحديثات (Pull Request)</button>\n<button id="gmailBtn" type="button">فتح Gmail</button>\n</div>
+<button id="logoutBtn" class="secondary hidden">إنهاء الجلسة</button>
+</section>
+<section class="panel"><h2>خدمات السائق</h2>
+<button id="walletBtn" class="secondary" disabled>عرض بيانات المحفظة التجريبية</button>
+<button id="routeBtn" class="secondary" disabled>عرض بيانات الرحلة التجريبية</button>
+</section>
+<section id="adminPanel" class="panel hidden"><h2>لوحة مسؤول البيانات</h2>
+<p>تتطلب دور sanad-admin أو admin من Keycloak. الملفات المقبولة CSV وJSON بحد أقصى 5 ميغابايت و10,000 سجل.</p>
+<button id="seedBtn">إضافة بيانات اختبار اصطناعية</button>
+<div><label for="datasetFile">رفع ملف بيانات:</label> <input id="datasetFile" type="file" accept=".csv,.json">
+<button id="uploadBtn">رفع وتشفير الملف</button></div>
+<button id="listBtn" class="secondary">تحديث قائمة البيانات</button>
+<pre id="datasets">لا توجد بيانات محملة بعد.</pre>
+</section>
+<section class="panel"><h2>محاكاة هجوم التصيّد الصوتي (Vishing)</h2>
+<p>اختبار دفاعي يستخدم رمز Bearer اصطناعياً وغير صالح لمحاولة الوصول إلى مورد المحفظة المحمي. لا يستخدم بيانات اعتماد حقيقية ولا ينفّذ إصداراً أو تغييراً للتوكن.</p>
+<button id="vishingBtn" class="danger">تشغيل محاكاة Vishing</button>
+<div id="vishingStatus" class="status" role="status" aria-live="polite">لم تُشغّل المحاكاة بعد.</div>
+<pre id="vishingOutput">ستظهر هنا نتيجة طلب الاختبار ورمز HTTP والتفسير الأمني.</pre>
+<p class="muted">401 = رفض/عدم صلاحية الرمز وفق استجابة الخدمة. 503 = تعذّر التحقق بسبب إعداد أو توفر خدمة Introspection؛ ولا يُعد دليلاً على أن الرمز رُفض.</p>
+</section>
+<section class="panel"><h2>استجابة الخدمة</h2><pre id="output">جاهز.</pre>
+<small>يُرسل Access Token في ترويسة Authorization فقط ولا يُحفظ في Local Storage. تسجيل الدخول يستخدم Authorization Code + PKCE عند إعداد عميل Keycloak العام.</small>
+</section></main>
 <script>
-  const output = document.getElementById("output");
-  async function callApi(path, withToken) {
-    output.textContent = "جارٍ إرسال الطلب...";
-    const headers = {};
-    const token = document.getElementById("token").value.trim();
-    if (withToken && token) headers.Authorization = `Bearer ${token}`;
-    try {
-      const response = await fetch(path, { method: "GET", headers, cache: "no-store" });
-      const body = await response.text();
-      output.textContent = `HTTP ${response.status}\n${body}`;
-    } catch (error) {
-      output.textContent = `Network error: ${String(error)}`;
-    }
+const $=id=>document.getElementById(id), output=$("output");
+let cfg=null, accessToken=null, refreshTimer=null;
+const b64u=bytes=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const randomBytes=n=>crypto.getRandomValues(new Uint8Array(n));
+async function sha256(s){return new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)))}
+function claims(token){try{return JSON.parse(atob(token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")))}catch{return {}}}
+function hasAdminRole(c){return (c.realm_access?.roles||[]).some(x=>["admin","sanad-admin"].includes(x))||(c.resource_access?.["driver-wallet-api"]?.roles||[]).some(x=>["admin","sanad-admin"].includes(x))}
+function isAdmin(c){/* UI hint only; exact email allowlist is enforced server-side after Keycloak introspection. */return hasAdminRole(c)&&c.email_verified===true}
+async function init(){
+ const r=await fetch("/lab/config",{cache:"no-store"});cfg=await r.json();
+ const url=new URL(cfg.issuer+"/.well-known/openid-configuration");
+ const d=await (await fetch(url)).json();cfg.auth=d.authorization_endpoint;cfg.token=d.token_endpoint;cfg.endSession=d.end_session_endpoint;
+ const params=new URLSearchParams(location.search);
+ if(params.has("error")){$("authStatus").textContent="فشل تسجيل الدخول: "+params.get("error");history.replaceState({}, "", location.pathname);return}
+ if(params.has("code")){
+  const verifier=sessionStorage.getItem("pkce_verifier"),state=sessionStorage.getItem("oidc_state");
+  if(!verifier||params.get("state")!==state){$("authStatus").textContent="رفض callback: state غير صالح.";return}
+  const body=new URLSearchParams({grant_type:"authorization_code",client_id:cfg.client_id,code:params.get("code"),redirect_uri:cfg.redirect_uri,code_verifier:verifier});
+  const tr=await fetch(cfg.token,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});
+  const data=await tr.json();sessionStorage.removeItem("pkce_verifier");sessionStorage.removeItem("oidc_state");history.replaceState({}, "", location.pathname);
+  if(!tr.ok||!data.access_token){$("authStatus").textContent="تعذر استبدال رمز التفويض. تحقق من إعداد Keycloak.";return}
+  accessToken=data.access_token;sessionStorage.setItem("sanad_access_token",accessToken);
+  // Short-lived token is held only in sessionStorage for this tab; no persistent localStorage.
+ }
+ const saved=sessionStorage.getItem("sanad_access_token");
+ if(!accessToken&&saved)accessToken=saved;
+ updateAuth();
+}
+function updateAuth(){
+ const ok=!!accessToken,c=ok?claims(accessToken):{};
+ $("authStatus").textContent=ok?"تم تسجيل الدخول: "+(c.preferred_username||c.sub||"مستخدم"):"لم يتم تسجيل الدخول.";
+ $("loginBtn").classList.toggle("hidden",ok);$("logoutBtn").classList.toggle("hidden",!ok);
+ $("walletBtn").disabled=!ok;$("routeBtn").disabled=!ok;
+ $("adminPanel").classList.toggle("hidden",!ok||!isAdmin(c));
+ $("adminLoginBtn").classList.toggle("hidden",ok&&isAdmin(c));
+}
+async function login(adminMode=false){
+ const verifier=b64u(randomBytes(48)),state=b64u(randomBytes(24)),nonce=b64u(randomBytes(24));
+ sessionStorage.setItem("pkce_verifier",verifier);sessionStorage.setItem("oidc_state",state);
+ const challenge=b64u(await sha256(verifier));
+ const u=new URL(cfg.auth);Object.entries({client_id:cfg.client_id,response_type:"code",scope:cfg.scopes,redirect_uri:cfg.redirect_uri,code_challenge:challenge,code_challenge_method:"S256",state,nonce,...(adminMode?{prompt:"login"}:{})}).forEach(([k,v])=>u.searchParams.set(k,v));
+ location.assign(u.toString());
+}
+async function api(path,opts={}){
+ if(!accessToken){output.textContent="سجل الدخول أولاً.";return}
+ const headers={Authorization:"Bearer "+accessToken,...(opts.headers||{})};
+ const res=await fetch(path,{...opts,headers,cache:"no-store"});
+ const body=await res.text();output.textContent="HTTP "+res.status+"\n"+body;
+ if(res.status===401){accessToken=null;sessionStorage.removeItem("sanad_access_token");updateAuth()}
+ return body;
+}
+$("loginBtn").onclick=()=>login(false);
+$("adminLoginBtn").onclick=()=>login(true);
+$("openBrowserBtn").onclick=()=>window.open(window.location.origin+"/","_blank","noopener,noreferrer");\nconst openExternal=url=>window.open(url,"_blank","noopener,noreferrer");\n$("projectBtn").onclick=()=>openExternal("https://github.com/alqayadhia123/SANAD-Research-Project");\n$("githubBtn").onclick=()=>openExternal("https://github.com/alqayadhia123/SANAD-Research-Project");\n$("pullRequestBtn").onclick=()=>openExternal("https://github.com/alqayadhia123/SANAD-Research-Project/pull/7");\n$("gmailBtn").onclick=()=>openExternal("https://mail.google.com/");
+$("logoutBtn").onclick=()=>{accessToken=null;sessionStorage.removeItem("sanad_access_token");updateAuth();location.assign(cfg.endSession+"?client_id="+encodeURIComponent(cfg.client_id)+"&post_logout_redirect_uri="+encodeURIComponent(location.origin+"/"))};
+$("walletBtn").onclick=()=>api("/api/driver/wallet");
+$("routeBtn").onclick=()=>api("/api/driver/route");
+$("seedBtn").onclick=()=>api("/api/admin/datasets/seed",{method:"POST"}).then(()=>listDatasets());
+$("uploadBtn").onclick=async()=>{const f=$("datasetFile").files[0];if(!f){output.textContent="اختر ملف CSV أو JSON أولاً.";return}const fd=new FormData();fd.append("file",f);await api("/api/admin/datasets/upload",{method:"POST",body:fd});await listDatasets()};
+async function runVishingSimulation(){
+ const button=$("vishingBtn"), status=$("vishingStatus"), result=$("vishingOutput");
+ button.disabled=true;status.textContent="جارٍ إرسال رمز اصطناعي إلى نقطة المحفظة المحمية…";
+ result.textContent="يُجرى الاختبار؛ لا يتم عرض الرمز الاصطناعي أو تسجيله.";
+ try{
+  const res=await fetch("/api/driver/wallet",{
+   method:"GET",
+   headers:{Authorization:"Bearer SANAD-VISHING-SIMULATION.INVALID.TOKEN"},
+   cache:"no-store"
+  });
+  let payload={};try{payload=await res.json()}catch{}
+  const code=res.status, reason=payload.error||"no_error_code";
+  let verdict;
+  if(code===401){
+   verdict="رفض مصادقة (401). الخدمة رفضت الطلب. إذا كان السبب inactive_token فهذا يثبت أن Introspection أعادت رمزاً غير نشط.";
+  }else if(code===503){
+   verdict="تعذّر التحقق (503). خدمة Introspection أو إعدادها غير متاح؛ لا يمكن استنتاج أن الرمز رُفض.";
+  }else if(code===403){
+   verdict="رفض صلاحية (403). تم الوصول إلى فحص الصلاحيات لكن النطاق المطلوب غير متاح.";
+  }else if(code===200){
+   verdict="نتيجة غير متوقعة وخطيرة: قُبل طلب المحاكاة. أوقف الاختبار وافحص إعدادات التحقق فوراً.";
+  }else{
+   verdict="استجابة غير متوقعة؛ راجع رمز HTTP وسبب الاستجابة قبل إصدار حكم أمني.";
   }
-  document.getElementById("walletBtn").addEventListener("click",
-    () => callApi("/api/driver/wallet", true));
-  document.getElementById("healthBtn").addEventListener("click",
-    () => callApi("/health", false));
-</script>
-</body>
-</html>
+  status.textContent="اكتملت المحاكاة — HTTP "+code;
+  result.textContent=JSON.stringify({http_status:code,error:reason,interpretation:verdict,synthetic_test:true},null,2);
+ }catch(e){
+  status.textContent="تعذّر إكمال المحاكاة";
+  result.textContent="Network/client error: "+String(e)+"\nهذه ليست نتيجة رفض توكن من Keycloak.";
+ }finally{button.disabled=false}
+}
+$("vishingBtn").onclick=runVishingSimulation;
+async function listDatasets(){const raw=await api("/api/admin/datasets");try{$("datasets").textContent=JSON.stringify(JSON.parse(raw).datasets||JSON.parse(raw),null,2)}catch{$("datasets").textContent=raw}}
+$("listBtn").onclick=listDatasets;
+init().catch(e=>{$("authStatus").textContent="تعذر تحميل إعدادات الهوية: "+String(e)});
+</script></body></html>

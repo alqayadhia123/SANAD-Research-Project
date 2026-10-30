@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && useradd --system --gid app --home-dir /app app
 
 COPY app.py .
+COPY admin_data.py .
 COPY templates ./templates
 USER app
 

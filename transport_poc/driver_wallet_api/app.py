@@ -7,10 +7,11 @@ import base64
 import json
 import os
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
 from flask import Flask, jsonify, render_template, request
+from admin_data import register_admin_routes
 
 
 def create_app(test_config=None):
@@ -27,7 +28,14 @@ def create_app(test_config=None):
         HTTP_TIMEOUT_SECONDS=float(os.getenv("HTTP_TIMEOUT_SECONDS", "3")),
         INTROSPECTION_URL=os.getenv("INTROSPECTION_URL", ""),
         KEYCLOAK_INTERNAL_HOSTPORT=os.getenv("KEYCLOAK_INTERNAL_HOSTPORT", "").strip(),
-        MAX_CONTENT_LENGTH=16 * 1024,
+        MAX_CONTENT_LENGTH=6 * 1024 * 1024,
+        PUBLIC_OIDC_CLIENT_ID=os.getenv("PUBLIC_OIDC_CLIENT_ID", "sanad-driver-web"),
+        ADMIN_EMAIL=os.getenv("SANAD_ADMIN_EMAIL", "alqayadhia@gmail.com").strip().lower(),
+        ALLOWED_TOKEN_CLIENT_IDS=os.getenv("ALLOWED_TOKEN_CLIENT_IDS", os.getenv("PUBLIC_OIDC_CLIENT_ID", "sanad-driver-web")),
+        PUBLIC_OIDC_ISSUER=os.getenv("PUBLIC_OIDC_ISSUER", "http://localhost:8080/realms/sanad-lab").rstrip("/"),
+        OIDC_REDIRECT_URI=os.getenv("OIDC_REDIRECT_URI", ""),
+        SANAD_DATA_DIR=os.getenv("SANAD_DATA_DIR", "/tmp/sanad-data"),
+        SANAD_DATA_ENCRYPTION_KEY=os.getenv("SANAD_DATA_ENCRYPTION_KEY", ""),
     )
     if test_config:
         app.config.update(test_config)
@@ -88,6 +96,11 @@ def create_app(test_config=None):
         ):
             return None, "issuer_missing_or_mismatch"
 
+        allowed_clients = set(app.config["ALLOWED_TOKEN_CLIENT_IDS"].split())
+        token_client = payload.get("client_id") or payload.get("azp")
+        if not allowed_clients or not isinstance(token_client, str) or token_client not in allowed_clients:
+            return None, "client_mismatch"
+
         subject = payload.get("sub")
         if not isinstance(subject, str) or not subject.strip():
             return None, "subject_missing"
@@ -119,12 +132,25 @@ def create_app(test_config=None):
             return None, (jsonify(error="insufficient_scope"), 403)
         return claims, None
 
+    register_admin_routes(app, require_wallet_access)
+
+    @app.get("/lab/config")
+    def lab_config():
+        return jsonify(
+            issuer=app.config["PUBLIC_OIDC_ISSUER"],
+            client_id=app.config["PUBLIC_OIDC_CLIENT_ID"],
+            redirect_uri=app.config["OIDC_REDIRECT_URI"] or request.url_root.rstrip("/") + "/",
+            scopes="openid profile email wallet:read",
+            note="Public OIDC client must be configured for Authorization Code + PKCE (S256).",
+        ), 200
+
     @app.before_request
     def enforce_request_size():
         # Flask enforces MAX_CONTENT_LENGTH when a body is read. Check the
         # declared length before route logic so even endpoints that do not
         # parse a body reject oversized requests consistently.
-        if request.content_length is not None and request.content_length > app.config["MAX_CONTENT_LENGTH"]:
+        limit = app.config["MAX_CONTENT_LENGTH"] if request.path == "/api/admin/datasets/upload" else 16 * 1024
+        if request.content_length is not None and request.content_length > limit:
             return jsonify(error="request_too_large"), 413
         return None
 
@@ -138,7 +164,7 @@ def create_app(test_config=None):
             "Content-Security-Policy",
             "default-src 'self'; script-src 'self' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
-            "connect-src 'self'; frame-ancestors 'none'",
+            f"connect-src 'self' {urlparse(app.config['PUBLIC_OIDC_ISSUER']).scheme}://{urlparse(app.config['PUBLIC_OIDC_ISSUER']).netloc}; frame-ancestors 'none'",
         )
         response.headers.setdefault(
             "Cache-Control",
