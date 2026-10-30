@@ -12,6 +12,7 @@ dependencies = [
   "gunicorn==23.0.0",
   "redis==5.2.1",
   "celery==5.4.0",
+  "requests==2.32.5",
 ]
 
 [project.optional-dependencies]
