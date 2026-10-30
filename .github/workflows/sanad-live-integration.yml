@@ -1,0 +1,164 @@
+name: SANAD live integration validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "transport_poc/**"
+      - ".github/workflows/sanad-live-integration.yml"
+  push:
+    branches: [fix/sanad-p0-security-baseline]
+    paths:
+      - "transport_poc/**"
+      - ".github/workflows/sanad-live-integration.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  live-keycloak-postgres-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare isolated integration environment
+        shell: bash
+        run: |
+          cat > transport_poc/.env <<'EOF'
+          POSTGRES_DB=sanad_ci
+          POSTGRES_USER=sanad_ci
+          POSTGRES_PASSWORD=ci-only-postgres-password
+          KC_BOOTSTRAP_ADMIN_USERNAME=admin
+          KC_BOOTSTRAP_ADMIN_PASSWORD=ci-only-keycloak-password
+          KEYCLOAK_HOST_PORT=18080
+          TRANSPORT_API_PORT=15001
+          KEYCLOAK_ISSUER=http://keycloak-transport:8080/realms/sanad-lab
+          OIDC_CLIENT_ID=driver-wallet-api
+          OIDC_CLIENT_SECRET=ci-only-client-secret
+          EXPECTED_AUDIENCE=driver-wallet-api
+          REQUIRED_WALLET_SCOPE=wallet:read
+          HTTP_TIMEOUT_SECONDS=5
+          EOF
+
+      - name: Start PostgreSQL, Keycloak, and SANAD API
+        run: docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml up --build -d
+
+      - name: Wait for Keycloak
+        shell: bash
+        run: |
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:18080/realms/master/.well-known/openid-configuration >/dev/null; then
+              echo "Keycloak is responding"
+              exit 0
+            fi
+            sleep 3
+          done
+          docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml logs --no-color keycloak-transport postgres-transport
+          exit 1
+
+      - name: Configure disposable realm, client, scope, and test user
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml exec -T keycloak-transport bash -ec '
+            kcadm.sh config credentials --server http://localhost:8080 --realm master --user "$KC_BOOTSTRAP_ADMIN_USERNAME" --password "$KC_BOOTSTRAP_ADMIN_PASSWORD"
+            kcadm.sh create realms -s realm=sanad-lab -s enabled=true
+            CLIENT_ID=$(kcadm.sh create clients -r sanad-lab -i \
+              -s clientId=driver-wallet-api \
+              -s enabled=true \
+              -s protocol=openid-connect \
+              -s publicClient=false \
+              -s clientAuthenticatorType=client-secret \
+              -s secret=ci-only-client-secret \
+              -s directAccessGrantsEnabled=true)
+            kcadm.sh create "clients/$CLIENT_ID/protocol-mappers/models" -r sanad-lab \
+              -s name=sanad-api-audience \
+              -s protocol=openid-connect \
+              -s protocolMapper=oidc-audience-mapper \
+              -s "config.included.client.audience=driver-wallet-api" \
+              -s "config.access.token.claim=true" \
+              -s "config.id.token.claim=false"
+            SCOPE_ID=$(kcadm.sh create client-scopes -r sanad-lab -i \
+              -s name=wallet:read -s protocol=openid-connect \
+              -s 'attributes."display.on.consent.screen"=false')
+            kcadm.sh create "client-scopes/$SCOPE_ID/protocol-mappers/models" -r sanad-lab \
+              -s name=sanad-wallet-scope \
+              -s protocol=openid-connect \
+              -s protocolMapper=oidc-hardcoded-claim-mapper \
+              -s "config.claim.name=scope" \
+              -s "config.claim.value=wallet:read" \
+              -s "config.jsonType.label=String" \
+              -s "config.access.token.claim=true" \
+              -s "config.id.token.claim=false"
+            kcadm.sh update "clients/$CLIENT_ID/optional-client-scopes/$SCOPE_ID" -r sanad-lab
+            kcadm.sh create users -r sanad-lab -s username=sanad-ci-user -s enabled=true
+            USER_ID=$(kcadm.sh get users -r sanad-lab -q username=sanad-ci-user --fields id --format csv --noquotes | tail -n 1)
+            kcadm.sh set-password -r sanad-lab --userid "$USER_ID" --new-password ci-only-user-password
+          '
+
+      - name: Wait for SANAD API
+        shell: bash
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:15001/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml logs --no-color driver-api
+          exit 1
+
+      - name: Verify real token introspection and authorization decisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN_URL="http://127.0.0.1:18080/realms/sanad-lab/protocol/openid-connect/token"
+          CLIENT_SECRET="ci-only-client-secret"
+          USER_PASSWORD="ci-only-user-password"
+
+          NO_SCOPE_TOKEN=$(curl --fail --silent "$TOKEN_URL" \
+            -d grant_type=password -d client_id=driver-wallet-api \
+            -d client_secret="$CLIENT_SECRET" -d username=sanad-ci-user \
+            -d password="$USER_PASSWORD" | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+
+          VALID_TOKEN=$(curl --fail --silent "$TOKEN_URL" \
+            -d grant_type=password -d client_id=driver-wallet-api \
+            -d client_secret="$CLIENT_SECRET" -d username=sanad-ci-user \
+            -d password="$USER_PASSWORD" -d 'scope=openid wallet:read' | \
+            python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+
+          MISSING_STATUS=$(curl --silent --output /tmp/missing.json --write-out '%{http_code}' \
+            http://127.0.0.1:15001/api/driver/wallet)
+          test "$MISSING_STATUS" = "401"
+
+          DENIED_STATUS=$(curl --silent --output /tmp/denied.json --write-out '%{http_code}' \
+            http://127.0.0.1:15001/api/driver/wallet \
+            -H "Authorization: Bearer $NO_SCOPE_TOKEN")
+          test "$DENIED_STATUS" = "403"
+
+          VALID_STATUS=$(curl --silent --output /tmp/valid.json --write-out '%{http_code}' \
+            http://127.0.0.1:15001/api/driver/wallet \
+            -H "Authorization: Bearer $VALID_TOKEN")
+          test "$VALID_STATUS" = "200"
+          python -c 'import json; d=json.load(open("/tmp/valid.json")); assert d["synthetic_data"] is True; assert d["status"] == "success"'
+
+          INVALID_STATUS=$(curl --silent --output /tmp/invalid.json --write-out '%{http_code}' \
+            http://127.0.0.1:15001/api/driver/wallet \
+            -H "Authorization: Bearer definitely-not-a-real-token")
+          test "$INVALID_STATUS" = "401"
+
+          echo "Live Keycloak introspection integration passed: missing=401 insufficient_scope=403 valid=200 invalid=401"
+
+      - name: Collect service logs on failure
+        if: failure()
+        run: docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml logs --no-color
+
+      - name: Stop services and remove CI volumes
+        if: always()
+        run: docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml down --volumes --remove-orphans
+
+      - name: Remove temporary environment file
+        if: always()
+        run: rm -f transport_poc/.env
