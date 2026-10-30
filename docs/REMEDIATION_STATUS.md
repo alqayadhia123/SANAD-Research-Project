@@ -1,51 +1,68 @@
 # SANAD Remediation Status
 
-## Changes committed in this branch
+**Last reviewed:** 2026-10-30  
+**Branch:** `fix/sanad-p0-security-baseline`  
+**Gate:** `PRODUCTION_GATE=CLOSED`
 
-- Flask application factory and route registration baseline.
-- Token introspection failures fail closed.
-- Explicit audience and mandatory exact issuer validation; missing issuer is rejected.
-- Bearer scheme parsing is case-insensitive; request bodies are capped at 16 KiB.
-- Required wallet scope enforced.
-- Missing/invalid bearer token returns 401; insufficient scope returns 403.
-- Authorization-server outage or missing introspection configuration returns 503.
-- Bearer tokens are size-bounded; introspection responses are read with a 64 KiB cap.
-- Scope claims must be strings and include the configured required scope.
-- Security response headers include CSP, frame/content-type/referrer protections, and permissions policy; API responses are marked `Cache-Control: no-store` and UI responses `no-cache`.
-- Authenticator enrollment is itself authorization-protected and still returns HTTP 501; unauthenticated enrollment attempts return 401.
-- `/lab/ready` reports configuration presence only and explicitly does not claim identity-provider connectivity.
-- Synthetic-only wallet and route endpoints.
-- Authenticator enrollment explicitly returns 501 until a real secure workflow exists.
-- Browser-side hardcoded admin authentication and misleading WebAuthn/Vishing success states removed.
-- Compose publishes API and Keycloak only on host loopback and uses an internal lab network.
-- Mocked pytest suite covers issuer absence/mismatch, scope and audience types, oversized bearer tokens and introspection responses, malformed JSON, outage behavior, enrollment authorization, and security headers; scenario matrix retains NOT RUN / BLOCKED initial states.
-- Environment template and ignore rules.
+## Implemented in the remediation branch
 
-## Not implemented / not verified
+- Flask application factory and explicit route registration.
+- Keycloak token introspection with fail-closed behavior on missing configuration, network errors, malformed responses, and inactive tokens.
+- Exact configured issuer and expected audience checks; non-empty subject required.
+- Case-insensitive Bearer scheme parsing and an 8 KiB bearer-token limit.
+- Required wallet scope validation; malformed or insufficient scope claims are denied.
+- Introspection response size capped at 64 KiB.
+- Request body length is rejected with HTTP 413 before route logic when the declared size exceeds 16 KiB; Flask's own body limit remains enabled.
+- Protected wallet and route endpoints; authenticator enrollment is authorization-protected and returns HTTP 501 until a genuine secure ceremony exists.
+- Security response headers and `Cache-Control: no-store` on API responses.
+- Synthetic-only wallet and route records; no real funds, customer records, or production transport integrations.
+- Removal of hardcoded browser-side administrator credentials and misleading WebAuthn/Vishing success states.
+- Compose network isolation and loopback-only published API/Keycloak ports.
+- Python tests expanded from 25 to 30 test cases covering route authorization, request-size rejection, strict active-claim typing, and the introspection HTTP request contract. The new 30-test suite is **pending CI confirmation** for this revision.
 
-- Live Keycloak realm/client provisioning and integration.
-- Real WebAuthn registration and assertion verification.
-- Independent OOB approval channel.
-- Secure account recovery flow.
-- Persistent application audit storage.
-- End-to-end revocation timing.
-- Browser automation or real authenticator tests.
-- Docker image build and live Compose deployment.
-- Production readiness.
+## CI evidence and current rerun status
 
-## Validation status
+The previous branch head (`1bdfb9fd1e15c43610de7bc7242653b10c78ce8d`) had:
+- Python workflow: success (25 tests and source compilation).
+- Container workflow: success (Compose validation, API image build, and container `/health` smoke test).
+- Live integration workflow: failure at the Keycloak readiness wait step. Realm provisioning and real token-introspection assertions were skipped.
 
-Python syntax compilation is a static check only. Mocked tests, Docker, and live
-Keycloak must be executed in a provisioned environment before any security
-effectiveness claims are made. Do not report ASR/FPR values without actual
-pre-registered experiments and evidence.
+The live integration workflow has now been changed to poll the Keycloak master-realm OIDC discovery document directly, validate required discovery fields, and emit service status/log diagnostics on timeout. This change is intended to improve readiness detection and diagnosis; it is **not yet considered fixed until a new workflow run passes**.
 
-## Branch synchronization
+The current revision also adds the 16 KiB request-size guard and five additional tests. Do not report these new tests as passed until GitHub Actions completes successfully on the current commit.
 
-The remediation branch has been synchronized with the current `main` commit using a two-parent merge commit. The branch is no longer behind `main`; GitHub Actions is re-running the full Python workflow on the synchronized head.
+## Not implemented or not yet verified
 
-## Gate
+- Live Keycloak realm/client provisioning and end-to-end introspection/authorization against the current branch revision.
+- Real WebAuthn registration and assertion verification, including origin/RP ID checks, challenge lifecycle, and replay prevention.
+- Independent out-of-band transaction approval.
+- Secure account recovery and recovery-factor rotation.
+- Persistent, tamper-evident application audit storage.
+- Measured session/token revocation latency under realistic conditions.
+- Browser automation and real authenticator interoperability.
+- Production Keycloak configuration, TLS deployment, secrets management, backups, monitoring, and operational hardening.
+- Independent penetration testing and a pre-registered attack-evaluation study.
 
-`PRODUCTION_GATE=CLOSED`
+## Research integrity rules
 
-A passing mocked unit test suite is necessary but insufficient for security validation.
+- CI success is software validation evidence, not proof of resistance to vishing, phishing, account takeover, or social engineering.
+- A mocked introspection test is not equivalent to a live identity-provider integration test.
+- A successful `/health` response proves process availability only.
+- Keep scenario results as `NOT RUN`, `BLOCKED`, or explicit observed outcomes until linked to run artifacts/logs.
+- Do not publish ASR, FPR, attack-success reduction, or security-effectiveness claims without a pre-registered protocol, defined denominators, repeated trials, and retained evidence.
+
+## Local validation commands
+
+From the repository root:
+
+```bash
+python -m pip install -r transport_poc/driver_wallet_api/requirements-dev.txt
+python -m py_compile transport_poc/driver_wallet_api/app.py
+cd transport_poc/driver_wallet_api
+pytest -q
+cd ../..
+docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml config --quiet
+docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml up --build -d
+```
+
+Use only disposable lab credentials and synthetic data. Never commit `transport_poc/.env` or production secrets.
