@@ -64,6 +64,13 @@ def create_app(test_config=None):
         g.authenticated_claims = data
         return data, None
 
+    @app.before_request
+    def authenticate_api_requests():
+        if request.path.startswith("/api/"):
+            _, failure = authorized_subject()
+            if failure:
+                return failure
+
     @app.after_request
     def add_security_headers(response):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -89,8 +96,7 @@ def create_app(test_config=None):
     @app.get("/api/driver/wallet")
     @require_tenant
     def get_wallet():
-        token_data, failure = authorized_subject()
-        if failure: return failure
+        token_data = g.authenticated_claims
         return jsonify(status="success",
             driver=token_data.get("preferred_username", token_data.get("sub", "synthetic-driver")),
             wallet_balance=1450.00, currency="SAR", synthetic_data=True,
@@ -109,8 +115,6 @@ def create_app(test_config=None):
     @app.post("/api/driver/enroll-authenticator")
     @require_tenant
     def enroll_authenticator():
-        _, failure = authorized_subject()
-        if failure: return failure
         return jsonify(status="denied", error="authenticator_enrollment_not_implemented",
             message="يلزم تنفيذ WebAuthn challenge/attestation والتحقق منهما قبل التسجيل."), 501
     return app
