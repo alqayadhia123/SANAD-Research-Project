@@ -154,3 +154,12 @@ def test_admin_routes_require_verified_email_claim(monkeypatch, tmp_path):
     response = client.get("/api/admin/datasets", headers={"Authorization": "Bearer test-token"})
     assert response.status_code == 403
     assert response.get_json()["error"] == "admin_identity_not_verified"
+
+
+def test_public_oidc_config_does_not_disclose_admin_email():
+    client = api.create_app({"TESTING": True}).test_client()
+    response = client.get("/lab/config")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert "admin_email" not in payload
+    assert "alqayadhia@gmail.com" not in response.get_data(as_text=True)
