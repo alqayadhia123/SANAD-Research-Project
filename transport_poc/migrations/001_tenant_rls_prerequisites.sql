@@ -17,9 +17,12 @@ BEGIN
     -- true = transaction-local; connection-pool reuse cannot retain the tenant.
     PERFORM set_config('app.current_tenant', p_tenant, true);
 END;
-$$;
+$;
 
-DO $$
+-- Runtime-role execution must be granted explicitly after that role is provisioned.
+REVOKE ALL ON FUNCTION sanad_set_tenant_context(text) FROM PUBLIC;
+
+DO $
 DECLARE
     target_table text;
     required_tables text[] := ARRAY['drivers', 'sessions', 'audit_logs'];
