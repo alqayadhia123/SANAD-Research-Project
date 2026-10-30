@@ -14,7 +14,11 @@ class FakeResponse:
         return False
 
     def read(self, size=-1):
-        raw = json.dumps(self.payload).encode("utf-8")
+        raw = (
+            self.payload
+            if isinstance(self.payload, bytes)
+            else json.dumps(self.payload).encode("utf-8")
+        )
         return raw if size < 0 else raw[:size]
 
 
@@ -174,3 +178,41 @@ def test_health_has_security_headers():
     client = api.create_app({"TESTING": True}).test_client()
     response = client.get("/health")
     assert response.headers["X-Content-Type-Options"] == "nosniff"
+
+
+def test_oversized_introspection_response_returns_503(monkeypatch):
+    client = make_client(monkeypatch, b"x" * 65537)
+    response = client.get("/api/driver/wallet",
+                          headers={"Authorization": "Bearer test-token"})
+    assert response.status_code == 503
+    assert response.get_json()["error"] == "introspection_response_too_large"
+
+
+def test_malformed_introspection_json_returns_503(monkeypatch):
+    client = make_client(monkeypatch, b"{not-json")
+    response = client.get("/api/driver/wallet",
+                          headers={"Authorization": "Bearer test-token"})
+    assert response.status_code == 503
+    assert response.get_json()["error"] == "introspection_unavailable"
+
+
+def test_wallet_rejects_non_list_audience(monkeypatch):
+    client = make_client(monkeypatch, active_payload(aud={"driver-wallet-api": True}))
+    response = client.get("/api/driver/wallet",
+                          headers={"Authorization": "Bearer test-token"})
+    assert response.status_code == 401
+
+
+def test_wallet_rejects_empty_required_scope_configuration(monkeypatch):
+    client = api.create_app({
+        "TESTING": True,
+        "OIDC_CLIENT_ID": "driver-wallet-api",
+        "OIDC_CLIENT_SECRET": "test-secret",
+        "EXPECTED_AUDIENCE": "driver-wallet-api",
+        "REQUIRED_WALLET_SCOPE": "",
+        "KEYCLOAK_ISSUER": "https://idp.example/realms/sanad-lab",
+    }).test_client()
+    monkeypatch.setattr(api, "urlopen", lambda *args, **kwargs: FakeResponse(active_payload()))
+    response = client.get("/api/driver/wallet",
+                          headers={"Authorization": "Bearer test-token"})
+    assert response.status_code == 403
