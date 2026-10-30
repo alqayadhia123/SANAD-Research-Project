@@ -23,6 +23,7 @@ The mobility-oriented direction, branded **SANAD Mobility**, is to explore stron
 - [Verification plan and evidence register](docs/VERIFICATION_PLAN.md)
 - [Threat model and research claim boundaries](docs/THREAT_MODEL.md)
 - [Transport PoC operating notes](transport_poc/README.md)
+- [Free development and verification workflow](docs/FREE_DEVELOPMENT_WORKFLOW.md)
 
 ## Development and verification
 
