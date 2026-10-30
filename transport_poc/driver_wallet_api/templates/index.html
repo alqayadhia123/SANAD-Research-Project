@@ -55,7 +55,7 @@ const randomBytes=n=>crypto.getRandomValues(new Uint8Array(n));
 async function sha256(s){return new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)))}
 function claims(token){try{return JSON.parse(atob(token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")))}catch{return {}}}
 function hasAdminRole(c){return (c.realm_access?.roles||[]).some(x=>["admin","sanad-admin"].includes(x))||(c.resource_access?.["driver-wallet-api"]?.roles||[]).some(x=>["admin","sanad-admin"].includes(x))}
-function isAdmin(c){return hasAdminRole(c)&&String(c.email||"").toLowerCase()===String(cfg?.admin_email||"").toLowerCase()&&c.email_verified===true}
+function isAdmin(c){/* UI hint only; exact email allowlist is enforced server-side after Keycloak introspection. */return hasAdminRole(c)&&c.email_verified===true}
 async function init(){
  const r=await fetch("/lab/config",{cache:"no-store"});cfg=await r.json();
  const url=new URL(cfg.issuer+"/.well-known/openid-configuration");
