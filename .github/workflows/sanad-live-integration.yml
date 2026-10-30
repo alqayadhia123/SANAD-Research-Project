@@ -12,13 +12,17 @@ on:
       - "transport_poc/**"
       - ".github/workflows/sanad-live-integration.yml"
 
+concurrency:
+  group: sanad-live-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   live-keycloak-postgres-api:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,8 +59,8 @@ jobs:
 
           # Probe the OIDC endpoint that the integration actually depends on;
           # the Keycloak root path is not a reliable readiness contract.
-          for attempt in $(seq 1 120); do
-            LAST_STATUS=$(curl --silent --show-error --connect-timeout 3 --max-time 8 \
+          for attempt in $(seq 1 60); do
+            LAST_STATUS=$(curl --silent --show-error --connect-timeout 2 --max-time 3 \
               --output "$DISCOVERY_FILE" --write-out '%{http_code}' \
               "$DISCOVERY_URL" 2>/dev/null || true)
 
@@ -75,7 +79,7 @@ jobs:
             fi
 
             if (( attempt % 12 == 0 )); then
-              echo "Keycloak OIDC discovery not ready (attempt $attempt/120, HTTP $LAST_STATUS)"
+              echo "Keycloak OIDC discovery not ready (attempt $attempt/60, HTTP $LAST_STATUS)"
               docker compose --env-file transport_poc/.env -f transport_poc/docker-compose.transport.yaml ps --all
             fi
             sleep 5
