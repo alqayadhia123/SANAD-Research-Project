@@ -1,0 +1,29 @@
+[
+  {
+    "event_id": "EVT-SYN-001",
+    "driver_id": "DRV-SYN-001",
+    "event_type": "TOKEN_INTROSPECTION_ACCEPTED",
+    "severity": "INFO",
+    "outcome": "OBSERVED",
+    "occurred_at": "2026-01-15T09:00:00Z",
+    "data_classification": "SYNTHETIC"
+  },
+  {
+    "event_id": "EVT-SYN-002",
+    "driver_id": "DRV-SYN-002",
+    "event_type": "SUSPICIOUS_LOGIN_PATTERN",
+    "severity": "HIGH",
+    "outcome": "REQUIRES_REVIEW",
+    "occurred_at": "2026-01-15T09:05:00Z",
+    "data_classification": "SYNTHETIC"
+  },
+  {
+    "event_id": "EVT-SYN-003",
+    "driver_id": "DRV-SYN-003",
+    "event_type": "REVOKED_TOKEN_REJECTED",
+    "severity": "MEDIUM",
+    "outcome": "OBSERVED",
+    "occurred_at": "2026-01-15T09:10:00Z",
+    "data_classification": "SYNTHETIC"
+  }
+]
