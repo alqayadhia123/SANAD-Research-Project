@@ -103,6 +103,16 @@ def register_admin_routes(app, authorize):
         roles.update(resource_roles if isinstance(resource_roles, list) else [])
         if "sanad-admin" not in roles and "admin" not in roles:
             return None, (jsonify(error="admin_role_required"), 403)
+        # Only trust email claims returned by server-side Keycloak introspection.
+        expected_email = app.config.get("ADMIN_EMAIL", "").strip().lower()
+        actual_email = claims.get("email")
+        if (
+            not expected_email
+            or not isinstance(actual_email, str)
+            or actual_email.strip().lower() != expected_email
+            or claims.get("email_verified") is not True
+        ):
+            return None, (jsonify(error="admin_identity_not_verified"), 403)
         tenant_id = claims.get("tenant_id")
         if not isinstance(tenant_id, str) or not tenant_id.strip():
             return None, (jsonify(error="verified_tenant_claim_required"), 403)
