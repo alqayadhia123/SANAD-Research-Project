@@ -8,7 +8,7 @@ import app as api
 
 def admin_client(monkeypatch, tmp_path, roles=None):
     claims = {
-        "active": True, "sub": "admin-test-001",
+        "active": True, "client_id": "sanad-driver-web", "sub": "admin-test-001",
         "aud": ["driver-wallet-api"], "scope": "openid wallet:read",
         "iss": "https://idp.example/realms/sanad-lab", "tenant_id": "tenant-test-001",
         "realm_access": {"roles": roles or ["sanad-admin"]},
@@ -94,7 +94,7 @@ def test_dataset_isolation_between_tenants(monkeypatch, tmp_path):
     dataset_id = seeded.get_json()["id"]
 
     other_claims = {
-        "active": True, "sub": "other-admin", "aud": ["driver-wallet-api"],
+        "active": True, "client_id": "sanad-driver-web", "sub": "other-admin", "aud": ["driver-wallet-api"],
         "scope": "openid wallet:read", "iss": "https://idp.example/realms/sanad-lab",
         "tenant_id": "tenant-other", "realm_access": {"roles": ["sanad-admin"]},
     }

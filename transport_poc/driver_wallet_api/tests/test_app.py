@@ -45,6 +45,7 @@ def make_client(monkeypatch, payload=None, raises=None):
 def active_payload(**overrides):
     payload = {
         "active": True,
+        "client_id": "sanad-driver-web",
         "sub": "synthetic-user-001",
         "preferred_username": "synthetic-driver",
         "aud": ["driver-wallet-api"],
@@ -326,3 +327,12 @@ def test_introspection_uses_post_and_client_authentication(monkeypatch):
     assert "token=sample-token" in captured["body"]
     assert captured["timeout"] == 2.5
 
+
+
+
+def test_wallet_rejects_token_issued_to_another_client(monkeypatch):
+    client = make_client(monkeypatch, active_payload(client_id="untrusted-client"))
+    response = client.get("/api/driver/wallet",
+                          headers={"Authorization": "Bearer test-token"})
+    assert response.status_code == 401
+    assert response.get_json()["error"] == "client_mismatch"

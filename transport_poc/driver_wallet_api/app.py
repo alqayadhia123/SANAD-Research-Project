@@ -30,6 +30,7 @@ def create_app(test_config=None):
         KEYCLOAK_INTERNAL_HOSTPORT=os.getenv("KEYCLOAK_INTERNAL_HOSTPORT", "").strip(),
         MAX_CONTENT_LENGTH=6 * 1024 * 1024,
         PUBLIC_OIDC_CLIENT_ID=os.getenv("PUBLIC_OIDC_CLIENT_ID", "sanad-driver-web"),
+        ALLOWED_TOKEN_CLIENT_IDS=os.getenv("ALLOWED_TOKEN_CLIENT_IDS", os.getenv("PUBLIC_OIDC_CLIENT_ID", "sanad-driver-web")),
         PUBLIC_OIDC_ISSUER=os.getenv("PUBLIC_OIDC_ISSUER", "http://localhost:8080/realms/sanad-lab").rstrip("/"),
         OIDC_REDIRECT_URI=os.getenv("OIDC_REDIRECT_URI", ""),
         SANAD_DATA_DIR=os.getenv("SANAD_DATA_DIR", "/tmp/sanad-data"),
@@ -93,6 +94,11 @@ def create_app(test_config=None):
             or issuer.rstrip("/") != app.config["KEYCLOAK_ISSUER"]
         ):
             return None, "issuer_missing_or_mismatch"
+
+        allowed_clients = set(app.config["ALLOWED_TOKEN_CLIENT_IDS"].split())
+        token_client = payload.get("client_id") or payload.get("azp")
+        if not allowed_clients or not isinstance(token_client, str) or token_client not in allowed_clients:
+            return None, "client_mismatch"
 
         subject = payload.get("sub")
         if not isinstance(subject, str) or not subject.strip():
