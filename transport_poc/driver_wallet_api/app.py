@@ -26,6 +26,7 @@ def create_app(test_config=None):
         REQUIRED_WALLET_SCOPE=os.getenv("REQUIRED_WALLET_SCOPE", "wallet:read"),
         HTTP_TIMEOUT_SECONDS=float(os.getenv("HTTP_TIMEOUT_SECONDS", "3")),
         INTROSPECTION_URL=os.getenv("INTROSPECTION_URL", ""),
+        KEYCLOAK_INTERNAL_HOSTPORT=os.getenv("KEYCLOAK_INTERNAL_HOSTPORT", "").strip(),
         MAX_CONTENT_LENGTH=16 * 1024,
     )
     if test_config:
@@ -36,9 +37,16 @@ def create_app(test_config=None):
         if not secret or not token:
             return None, "introspection_not_configured"
 
-        endpoint = app.config["INTROSPECTION_URL"] or (
-            f"{app.config['KEYCLOAK_ISSUER']}/protocol/openid-connect/token/introspect"
-        )
+        endpoint = app.config["INTROSPECTION_URL"]
+        if not endpoint and app.config["KEYCLOAK_INTERNAL_HOSTPORT"]:
+            endpoint = (
+                f"http://{app.config['KEYCLOAK_INTERNAL_HOSTPORT']}"
+                f"/realms/sanad-lab/protocol/openid-connect/token/introspect"
+            )
+        if not endpoint:
+            endpoint = (
+                f"{app.config['KEYCLOAK_ISSUER']}/protocol/openid-connect/token/introspect"
+            )
         body = urlencode({"token": token, "token_type_hint": "access_token"}).encode()
         basic = base64.b64encode(
             f"{app.config['OIDC_CLIENT_ID']}:{secret}".encode()
