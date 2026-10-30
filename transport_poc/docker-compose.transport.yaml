@@ -32,7 +32,7 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?Set KC_BOOTSTRAP_ADMIN_PASSWORD}
       KC_HEALTH_ENABLED: "true"
     healthcheck:
-      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:9000/health/ready || exit 1"]
+      test: ["CMD-SHELL", "bash -ec \"echo > /dev/tcp/127.0.0.1/9000\""]
       interval: 10s
       timeout: 5s
       retries: 30
