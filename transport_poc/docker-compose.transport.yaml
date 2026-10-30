@@ -46,7 +46,7 @@ services:
     networks: [transport_lab]
   driver-api:
     build:
-      context: ../..
+      context: ..
       dockerfile: transport_poc/driver_wallet_api/Dockerfile
     restart: unless-stopped
     depends_on:
