@@ -1,12 +1,9 @@
 """Transport-domain protected API for an isolated research lab."""
-import base64
-import json
-import os
+import base64, json, os
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from flask import Flask, jsonify, render_template, request
-
 
 def create_app(test_config=None):
     app = Flask(__name__)
@@ -18,16 +15,14 @@ def create_app(test_config=None):
         HTTP_TIMEOUT_SECONDS=float(os.getenv("HTTP_TIMEOUT_SECONDS", "3")),
         MAX_CONTENT_LENGTH=16 * 1024,
     )
-    if test_config:
-        app.config.update(test_config)
+    if test_config: app.config.update(test_config)
 
     def introspect(token):
         secret = app.config["OIDC_CLIENT_SECRET"]
-        if not secret or not token:
-            return None, "introspection_not_configured"
+        if not secret or not token: return None, "introspection_not_configured"
         endpoint = app.config["KEYCLOAK_ISSUER"] + "/protocol/openid-connect/token/introspect"
-        body = urlencode({"token": token, "token_type_hint": "access_token"}).encode("utf-8")
-        credentials = (app.config["OIDC_CLIENT_ID"] + ":" + secret).encode("utf-8")
+        body = urlencode({"token": token, "token_type_hint": "access_token"}).encode()
+        credentials = (app.config["OIDC_CLIENT_ID"] + ":" + secret).encode()
         basic = base64.b64encode(credentials).decode("ascii")
         req = Request(endpoint, data=body, headers={
             "Authorization": "Basic " + basic,
@@ -35,6 +30,7 @@ def create_app(test_config=None):
             "Accept": "application/json",
         }, method="POST")
         try:
+            # urllib verifies TLS certificates by default.
             with urlopen(req, timeout=app.config["HTTP_TIMEOUT_SECONDS"]) as response:
                 data = json.loads(response.read().decode("utf-8"))
         except (HTTPError, URLError, TimeoutError, ValueError, OSError):
@@ -43,8 +39,7 @@ def create_app(test_config=None):
         if not isinstance(data, dict) or data.get("active") is not True:
             return None, "inactive_token"
         audience = data.get("aud", [])
-        if isinstance(audience, str):
-            audience = [audience]
+        if isinstance(audience, str): audience = [audience]
         if not isinstance(audience, list) or app.config["EXPECTED_AUDIENCE"] not in audience:
             return None, "audience_mismatch_or_missing"
         issuer = data.get("iss")
@@ -53,18 +48,13 @@ def create_app(test_config=None):
         return data, None
 
     def authorized_subject():
-        # --- DEMO MODE BYPASS FOR RENDER (Added) ---
-        if os.getenv("DEMO_MODE", "false").lower() == "true":
-            return {"sub": "demo-user", "preferred_username": "demo-driver"}, None
-        # -------------------------------------------
-
+        # No demo bypass: every protected endpoint requires Keycloak validation.
         header = request.headers.get("Authorization", "")
         scheme, separator, value = header.partition(" ")
         if not separator or scheme.lower() != "bearer" or not value.strip():
             return None, (jsonify(error="bearer_token_required"), 401)
         token = value.strip()
-        if len(token) > 8192:
-            return None, (jsonify(error="bearer_token_too_large"), 401)
+        if len(token) > 8192: return None, (jsonify(error="bearer_token_too_large"), 401)
         data, error = introspect(token)
         if error:
             status = 503 if error in {"introspection_not_configured", "introspection_unavailable"} else 401
@@ -81,63 +71,42 @@ def create_app(test_config=None):
         return response
 
     @app.get("/")
-    def driver_app():
-        return render_template("index.html")
+    def driver_app(): return render_template("index.html")
 
     @app.get("/health")
-    def health():
-        return jsonify(status="ok", component="driver-wallet-api", mode="isolated-research-lab")
+    def health(): return jsonify(status="ok", component="driver-wallet-api", mode="isolated-research-lab")
 
     @app.get("/lab/ready")
     def lab_ready():
-        return jsonify(
-            client_id=app.config["OIDC_CLIENT_ID"],
+        return jsonify(client_id=app.config["OIDC_CLIENT_ID"],
             expected_audience=app.config["EXPECTED_AUDIENCE"],
             client_secret_configured=bool(app.config["OIDC_CLIENT_SECRET"]),
-            note="Configuration presence only; not evidence of Keycloak connectivity or security efficacy.",
-        )
+            note="Configuration presence only; not evidence of Keycloak connectivity or security efficacy.")
 
     @app.get("/api/driver/wallet")
     def get_wallet():
         token_data, failure = authorized_subject()
-        if failure:
-            return failure
-        return jsonify(
-            status="success",
+        if failure: return failure
+        return jsonify(status="success",
             driver=token_data.get("preferred_username", token_data.get("sub", "synthetic-driver")),
-            wallet_balance=1450.00,
-            currency="SAR",
-            synthetic_data=True,
-            message="Synthetic wallet data; no real funds or financial actions are connected.",
-        )
+            wallet_balance=1450.00, currency="SAR", synthetic_data=True,
+            message="Synthetic wallet data; no real funds or financial actions are connected.")
 
     @app.get("/api/driver/route")
     def get_route():
         token_data, failure = authorized_subject()
-        if failure:
-            return failure
-        return jsonify(
-            status="success",
+        if failure: return failure
+        return jsonify(status="success",
             driver=token_data.get("preferred_username", token_data.get("sub", "synthetic-driver")),
-            route_id="RT-LAB-0001",
-            pickup="Synthetic pickup location",
-            dropoff="Synthetic drop-off location",
-            route_status="active",
-            synthetic_data=True,
-        )
+            route_id="RT-LAB-0001", pickup="Synthetic pickup location",
+            dropoff="Synthetic drop-off location", route_status="active", synthetic_data=True)
 
     @app.post("/api/driver/enroll-authenticator")
     def enroll_authenticator():
-        token_data, failure = authorized_subject()
-        if failure:
-            return failure
-        return jsonify(
-            status="denied",
-            error="authenticator_enrollment_not_implemented",
-            message="يلزم تنفيذ WebAuthn challenge/attestation والتحقق منهما قبل التسجيل.",
-        ), 501
-
+        _, failure = authorized_subject()
+        if failure: return failure
+        return jsonify(status="denied", error="authenticator_enrollment_not_implemented",
+            message="يلزم تنفيذ WebAuthn challenge/attestation والتحقق منهما قبل التسجيل."), 501
     return app
-
 
 app = create_app()
