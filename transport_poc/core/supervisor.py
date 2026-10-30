@@ -44,7 +44,10 @@ class Supervisor:
                     if service.critical:
                         return 1
                     if service.restart and not self.stopping:
+                        service.process = None
                         service.failures += 1
+                    else:
+                        service.process = None
                         delay = min(60, 2 ** min(service.failures, 6))
                         time.sleep(delay)
                         service.process = subprocess.Popen(service.command, start_new_session=True)
