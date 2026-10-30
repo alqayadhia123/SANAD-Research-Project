@@ -9,7 +9,7 @@ body{margin:0;background:#0b1220;color:#e5edf7;padding:22px}
 main{max-width:980px;margin:auto}.hero,.panel{background:#131f32;border:1px solid #2b3c55;border-radius:16px;padding:22px;margin-bottom:16px}
 h1{color:#7dd3fc;margin-top:0}h2{font-size:19px;color:#bae6fd}
 p,small{line-height:1.8;color:#b8c6d9}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
-button,.filebtn{border:0;border-radius:9px;padding:11px 15px;background:#38bdf8;color:#082f49;font-weight:bold;cursor:pointer;margin:5px 0}
+button,.filebtn{border:0;border-radius:9px;padding:11px 15px;background:#38bdf8;color:#082f49;font-weight:bold;cursor:pointer;margin:5px 0}button:focus-visible{outline:3px solid #facc15;outline-offset:2px}.quickLinks{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.quickLinks button{background:#26364d;color:#e2e8f0}
 button.secondary{background:#334155;color:#e2e8f0}button.danger{background:#b45309;color:white}
 input{max-width:100%;padding:10px;background:#0b1220;color:white;border:1px solid #52647e;border-radius:8px}
 pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#07101d;padding:14px;border-radius:9px;min-height:70px;max-height:420px;overflow:auto}
@@ -21,8 +21,8 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#07101d;padding:14px;
 <p>منصة بحثية لإدارة الهوية ومحفظة السائق. جميع البيانات المعروضة تجريبية ولا تمثل أرصدة أو معاملات حقيقية.</p>
 <div id="authStatus" class="status">لم يتم تسجيل الدخول.</div>
 <button id="loginBtn">تسجيل الدخول</button>
-<button id="adminLoginBtn" class="secondary">تسجيل الدخول الإداري — alqayadhia@gmail.com</button>
-<button id="openBrowserBtn" class="secondary" type="button">فتح SANAD في تبويب المتصفح</button>
+<button id="adminLoginBtn" class="secondary" type="button">تسجيل الدخول الإداري</button>
+<button id="openBrowserBtn" class="secondary" type="button">فتح واجهة SANAD</button>\n<div class="quickLinks" aria-label="روابط المشروع والخدمات">\n<button id="projectBtn" type="button">صفحة مشروع SANAD</button>\n<button id="githubBtn" type="button">مستودع GitHub</button>\n<button id="pullRequestBtn" type="button">مراجعة التحديثات (Pull Request)</button>\n<button id="gmailBtn" type="button">فتح Gmail</button>\n</div>
 <button id="logoutBtn" class="secondary hidden">إنهاء الجلسة</button>
 </section>
 <section class="panel"><h2>خدمات السائق</h2>
@@ -88,7 +88,7 @@ async function login(adminMode=false){
  const verifier=b64u(randomBytes(48)),state=b64u(randomBytes(24)),nonce=b64u(randomBytes(24));
  sessionStorage.setItem("pkce_verifier",verifier);sessionStorage.setItem("oidc_state",state);
  const challenge=b64u(await sha256(verifier));
- const u=new URL(cfg.auth);Object.entries({client_id:cfg.client_id,response_type:"code",scope:cfg.scopes,redirect_uri:cfg.redirect_uri,code_challenge:challenge,code_challenge_method:"S256",state,nonce,...(adminMode?{prompt:"login",login_hint:cfg.admin_email}:{})}).forEach(([k,v])=>u.searchParams.set(k,v));
+ const u=new URL(cfg.auth);Object.entries({client_id:cfg.client_id,response_type:"code",scope:cfg.scopes,redirect_uri:cfg.redirect_uri,code_challenge:challenge,code_challenge_method:"S256",state,nonce,...(adminMode?{prompt:"login"}:{})}).forEach(([k,v])=>u.searchParams.set(k,v));
  location.assign(u.toString());
 }
 async function api(path,opts={}){
@@ -101,7 +101,7 @@ async function api(path,opts={}){
 }
 $("loginBtn").onclick=()=>login(false);
 $("adminLoginBtn").onclick=()=>login(true);
-$("openBrowserBtn").onclick=()=>window.open(window.location.origin+"/","_blank","noopener,noreferrer");
+$("openBrowserBtn").onclick=()=>window.open(window.location.origin+"/","_blank","noopener,noreferrer");\nconst openExternal=url=>window.open(url,"_blank","noopener,noreferrer");\n$("projectBtn").onclick=()=>openExternal("https://github.com/alqayadhia123/SANAD-Research-Project");\n$("githubBtn").onclick=()=>openExternal("https://github.com/alqayadhia123/SANAD-Research-Project");\n$("pullRequestBtn").onclick=()=>openExternal("https://github.com/alqayadhia123/SANAD-Research-Project/pull/7");\n$("gmailBtn").onclick=()=>openExternal("https://mail.google.com/");
 $("logoutBtn").onclick=()=>{accessToken=null;sessionStorage.removeItem("sanad_access_token");updateAuth();location.assign(cfg.endSession+"?client_id="+encodeURIComponent(cfg.client_id)+"&post_logout_redirect_uri="+encodeURIComponent(location.origin+"/"))};
 $("walletBtn").onclick=()=>api("/api/driver/wallet");
 $("routeBtn").onclick=()=>api("/api/driver/route");
