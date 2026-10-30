@@ -1,0 +1,26 @@
+[
+  {
+    "wallet_id": "WAL-SYN-001",
+    "driver_id": "DRV-SYN-001",
+    "balance_minor_units": 145000,
+    "currency": "SAR",
+    "wallet_status": "ACTIVE",
+    "data_classification": "SYNTHETIC"
+  },
+  {
+    "wallet_id": "WAL-SYN-002",
+    "driver_id": "DRV-SYN-002",
+    "balance_minor_units": 0,
+    "currency": "SAR",
+    "wallet_status": "FROZEN",
+    "data_classification": "SYNTHETIC"
+  },
+  {
+    "wallet_id": "WAL-SYN-003",
+    "driver_id": "DRV-SYN-003",
+    "balance_minor_units": 27550,
+    "currency": "SAR",
+    "wallet_status": "ACTIVE",
+    "data_classification": "SYNTHETIC"
+  }
+]
