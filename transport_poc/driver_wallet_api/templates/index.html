@@ -35,6 +35,13 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#07101d;padding:14px;
 <button id="listBtn" class="secondary">تحديث قائمة البيانات</button>
 <pre id="datasets">لا توجد بيانات محملة بعد.</pre>
 </section>
+<section class="panel"><h2>محاكاة هجوم التصيّد الصوتي (Vishing)</h2>
+<p>اختبار دفاعي يستخدم رمز Bearer اصطناعياً وغير صالح لمحاولة الوصول إلى مورد المحفظة المحمي. لا يستخدم بيانات اعتماد حقيقية ولا ينفّذ إصداراً أو تغييراً للتوكن.</p>
+<button id="vishingBtn" class="danger">تشغيل محاكاة Vishing</button>
+<div id="vishingStatus" class="status" role="status" aria-live="polite">لم تُشغّل المحاكاة بعد.</div>
+<pre id="vishingOutput">ستظهر هنا نتيجة طلب الاختبار ورمز HTTP والتفسير الأمني.</pre>
+<p class="muted">401 = رفض/عدم صلاحية الرمز وفق استجابة الخدمة. 503 = تعذّر التحقق بسبب إعداد أو توفر خدمة Introspection؛ ولا يُعد دليلاً على أن الرمز رُفض.</p>
+</section>
 <section class="panel"><h2>استجابة الخدمة</h2><pre id="output">جاهز.</pre>
 <small>يُرسل Access Token في ترويسة Authorization فقط ولا يُحفظ في Local Storage. تسجيل الدخول يستخدم Authorization Code + PKCE عند إعداد عميل Keycloak العام.</small>
 </section></main>
@@ -94,6 +101,38 @@ $("walletBtn").onclick=()=>api("/api/driver/wallet");
 $("routeBtn").onclick=()=>api("/api/driver/route");
 $("seedBtn").onclick=()=>api("/api/admin/datasets/seed",{method:"POST"}).then(()=>listDatasets());
 $("uploadBtn").onclick=async()=>{const f=$("datasetFile").files[0];if(!f){output.textContent="اختر ملف CSV أو JSON أولاً.";return}const fd=new FormData();fd.append("file",f);await api("/api/admin/datasets/upload",{method:"POST",body:fd});await listDatasets()};
+async function runVishingSimulation(){
+ const button=$("vishingBtn"), status=$("vishingStatus"), result=$("vishingOutput");
+ button.disabled=true;status.textContent="جارٍ إرسال رمز اصطناعي إلى نقطة المحفظة المحمية…";
+ result.textContent="يُجرى الاختبار؛ لا يتم عرض الرمز الاصطناعي أو تسجيله.";
+ try{
+  const res=await fetch("/api/driver/wallet",{
+   method:"GET",
+   headers:{Authorization:"Bearer SANAD-VISHING-SIMULATION.INVALID.TOKEN"},
+   cache:"no-store"
+  });
+  let payload={};try{payload=await res.json()}catch{}
+  const code=res.status, reason=payload.error||"no_error_code";
+  let verdict;
+  if(code===401){
+   verdict="رفض مصادقة (401). الخدمة رفضت الطلب. إذا كان السبب inactive_token فهذا يثبت أن Introspection أعادت رمزاً غير نشط.";
+  }else if(code===503){
+   verdict="تعذّر التحقق (503). خدمة Introspection أو إعدادها غير متاح؛ لا يمكن استنتاج أن الرمز رُفض.";
+  }else if(code===403){
+   verdict="رفض صلاحية (403). تم الوصول إلى فحص الصلاحيات لكن النطاق المطلوب غير متاح.";
+  }else if(code===200){
+   verdict="نتيجة غير متوقعة وخطيرة: قُبل طلب المحاكاة. أوقف الاختبار وافحص إعدادات التحقق فوراً.";
+  }else{
+   verdict="استجابة غير متوقعة؛ راجع رمز HTTP وسبب الاستجابة قبل إصدار حكم أمني.";
+  }
+  status.textContent="اكتملت المحاكاة — HTTP "+code;
+  result.textContent=JSON.stringify({http_status:code,error:reason,interpretation:verdict,synthetic_test:true},null,2);
+ }catch(e){
+  status.textContent="تعذّر إكمال المحاكاة";
+  result.textContent="Network/client error: "+String(e)+"\nهذه ليست نتيجة رفض توكن من Keycloak.";
+ }finally{button.disabled=false}
+}
+$("vishingBtn").onclick=runVishingSimulation;
 async function listDatasets(){const raw=await api("/api/admin/datasets");try{$("datasets").textContent=JSON.stringify(JSON.parse(raw).datasets||JSON.parse(raw),null,2)}catch{$("datasets").textContent=raw}}
 $("listBtn").onclick=listDatasets;
 init().catch(e=>{$("authStatus").textContent="تعذر تحميل إعدادات الهوية: "+String(e)});
