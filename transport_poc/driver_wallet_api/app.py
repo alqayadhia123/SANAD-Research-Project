@@ -53,11 +53,7 @@ def create_app(test_config=None):
         return data, None
 
     def authorized_subject():
-        # --- DEMO MODE BYPASS FOR RENDER (Added) ---
-        if os.getenv("DEMO_MODE", "false").lower() == "true":
-            return {"sub": "demo-user", "preferred_username": "demo-driver"}, None
-        # -------------------------------------------
-
+        # Authentication is always enforced; there is no demo-mode bypass.
         header = request.headers.get("Authorization", "")
         scheme, separator, value = header.partition(" ")
         if not separator or scheme.lower() != "bearer" or not value.strip():
