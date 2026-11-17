@@ -7,10 +7,14 @@ on:
       - "fix/**"
     paths:
       - "transport_poc/driver_wallet_api/**"
+      - "transport_poc/docker-compose.transport.yaml"
+      - "env.transport.example"
       - ".github/workflows/sanad-auth-tests.yml"
   pull_request:
     paths:
       - "transport_poc/driver_wallet_api/**"
+      - "transport_poc/docker-compose.transport.yaml"
+      - "env.transport.example"
       - ".github/workflows/sanad-auth-tests.yml"
   workflow_dispatch:
 
@@ -36,6 +40,10 @@ jobs:
 
       - name: Install dependencies
         run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+
+      - name: Validate Docker Compose configuration
+        working-directory: .
+        run: docker compose --env-file env.transport.example -f transport_poc/docker-compose.transport.yaml config --quiet
 
       - name: Run authentication regression tests
         env:
