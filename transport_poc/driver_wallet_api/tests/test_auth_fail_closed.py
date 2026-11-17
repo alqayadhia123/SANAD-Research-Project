@@ -1,4 +1,4 @@
-"""Regression tests for authentication fail-closed behavior."""
+"""Regression tests for authentication and authorization fail-closed behavior."""
 import json
 import os
 import unittest
@@ -64,6 +64,17 @@ class AuthenticationFailClosedTests(unittest.TestCase):
         response.__enter__.return_value.read.return_value = json.dumps(payload).encode("utf-8")
         return patch("app.urlopen", return_value=response)
 
+    def _valid_claims(self, **extra):
+        claims = {
+            "active": True,
+            "aud": ["driver-wallet-api"],
+            "iss": "https://id.example.test/realms/sanad-lab",
+            "sub": "test-subject",
+            "preferred_username": "test-driver",
+        }
+        claims.update(extra)
+        return claims
+
     def test_inactive_token_is_rejected(self):
         client = self._configured_client()
         with self._mock_introspection({"active": False}):
@@ -90,11 +101,10 @@ class AuthenticationFailClosedTests(unittest.TestCase):
 
     def test_wrong_issuer_is_rejected(self):
         client = self._configured_client()
-        payload = {
-            "active": True,
-            "aud": ["driver-wallet-api"],
-            "iss": "https://attacker.example.test/realms/fake",
-        }
+        payload = self._valid_claims(
+            iss="https://attacker.example.test/realms/fake",
+            scope="wallet:read",
+        )
         with self._mock_introspection(payload):
             response = client.get(
                 "/api/driver/wallet",
@@ -103,22 +113,46 @@ class AuthenticationFailClosedTests(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.get_json()["error"], "issuer_mismatch_or_missing")
 
-    def test_valid_introspection_claims_allow_synthetic_wallet_read(self):
+    def test_wallet_requires_wallet_read_scope(self):
         client = self._configured_client()
-        payload = {
-            "active": True,
-            "aud": ["driver-wallet-api"],
-            "iss": "https://id.example.test/realms/sanad-lab",
-            "sub": "test-subject",
-            "preferred_username": "test-driver",
-        }
-        with self._mock_introspection(payload):
+        with self._mock_introspection(self._valid_claims(scope="profile")):
             response = client.get(
                 "/api/driver/wallet",
-                headers={"Authorization": "Bearer valid-test-token"},
+                headers={"Authorization": "Bearer valid-but-underprivileged-token"},
+            )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.get_json()["error"], "insufficient_scope")
+
+    def test_route_requires_route_read_scope(self):
+        client = self._configured_client()
+        with self._mock_introspection(self._valid_claims(scope="wallet:read")):
+            response = client.get(
+                "/api/driver/route",
+                headers={"Authorization": "Bearer wallet-only-token"},
+            )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.get_json()["error"], "insufficient_scope")
+
+    def test_valid_wallet_scope_allows_synthetic_wallet_read(self):
+        client = self._configured_client()
+        with self._mock_introspection(self._valid_claims(scope="wallet:read profile")):
+            response = client.get(
+                "/api/driver/wallet",
+                headers={"Authorization": "Bearer valid-wallet-token"},
             )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["driver"], "test-driver")
+        self.assertTrue(response.get_json()["synthetic_data"])
+
+    def test_valid_route_scope_allows_synthetic_route_read(self):
+        client = self._configured_client()
+        with self._mock_introspection(self._valid_claims(scope="route:read")):
+            response = client.get(
+                "/api/driver/route",
+                headers={"Authorization": "Bearer valid-route-token"},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["route_id"], "RT-LAB-0001")
         self.assertTrue(response.get_json()["synthetic_data"])
 
 
