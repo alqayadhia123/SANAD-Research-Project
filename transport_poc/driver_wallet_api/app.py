@@ -15,6 +15,8 @@ def create_app(test_config=None):
         OIDC_CLIENT_ID=os.getenv("OIDC_CLIENT_ID", "driver-wallet-api"),
         OIDC_CLIENT_SECRET=os.getenv("OIDC_CLIENT_SECRET", ""),
         EXPECTED_AUDIENCE=os.getenv("EXPECTED_AUDIENCE", "driver-wallet-api"),
+        REQUIRED_WALLET_SCOPE=os.getenv("REQUIRED_WALLET_SCOPE", "wallet:read"),
+        REQUIRED_ROUTE_SCOPE=os.getenv("REQUIRED_ROUTE_SCOPE", "route:read"),
         HTTP_TIMEOUT_SECONDS=float(os.getenv("HTTP_TIMEOUT_SECONDS", "3")),
         MAX_CONTENT_LENGTH=16 * 1024,
     )
@@ -67,6 +69,18 @@ def create_app(test_config=None):
             return None, (jsonify(error=error, access="denied"), status)
         return data, None
 
+    def has_required_scope(token_data, required_scope):
+        if not required_scope:
+            return True
+        granted = token_data.get("scope", "")
+        if isinstance(granted, str):
+            granted_scopes = set(granted.split())
+        elif isinstance(granted, list):
+            granted_scopes = set(item for item in granted if isinstance(item, str))
+        else:
+            granted_scopes = set()
+        return required_scope in granted_scopes
+
     @app.after_request
     def add_security_headers(response):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -90,6 +104,8 @@ def create_app(test_config=None):
             client_id=app.config["OIDC_CLIENT_ID"],
             expected_audience=app.config["EXPECTED_AUDIENCE"],
             client_secret_configured=bool(app.config["OIDC_CLIENT_SECRET"]),
+            required_wallet_scope=app.config["REQUIRED_WALLET_SCOPE"],
+            required_route_scope=app.config["REQUIRED_ROUTE_SCOPE"],
             note="Configuration presence only; not evidence of Keycloak connectivity or security efficacy.",
         )
 
@@ -98,6 +114,8 @@ def create_app(test_config=None):
         token_data, failure = authorized_subject()
         if failure:
             return failure
+        if not has_required_scope(token_data, app.config["REQUIRED_WALLET_SCOPE"]):
+            return jsonify(error="insufficient_scope", required_scope=app.config["REQUIRED_WALLET_SCOPE"], access="denied"), 403
         return jsonify(
             status="success",
             driver=token_data.get("preferred_username", token_data.get("sub", "synthetic-driver")),
@@ -112,6 +130,8 @@ def create_app(test_config=None):
         token_data, failure = authorized_subject()
         if failure:
             return failure
+        if not has_required_scope(token_data, app.config["REQUIRED_ROUTE_SCOPE"]):
+            return jsonify(error="insufficient_scope", required_scope=app.config["REQUIRED_ROUTE_SCOPE"], access="denied"), 403
         return jsonify(
             status="success",
             driver=token_data.get("preferred_username", token_data.get("sub", "synthetic-driver")),
