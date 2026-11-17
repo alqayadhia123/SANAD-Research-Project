@@ -17,10 +17,11 @@ Scope: `transport_poc/driver_wallet_api` and transport lab configuration.
 - Passed both scope settings through Docker Compose.
 - Converted `env.transport.example` into a plain sourceable environment file and added both scope variables.
 - Kept authenticator enrollment disabled with HTTP 501 until a complete WebAuthn ceremony validates challenge, origin, RP ID, attestation, and replay protections.
+- Added a static review of the supplied Django `fido.py` module and captured the FIDO passkey UI requirements without claiming either is implemented.
 
-## Regression tests
+## Regression tests and configuration validation
 
-File: `transport_poc/driver_wallet_api/tests/test_auth_fail_closed.py`
+File: `transport_poc/driver_wallet_api/tests/test_auth_fail_closed.py`.
 
 GitHub Actions ran the suite on Python 3.10.22. Result: **11 tests passed** (`Ran 11 tests ... OK`). Coverage includes:
 - No bearer token and oversized bearer token.
@@ -30,12 +31,15 @@ GitHub Actions ran the suite on Python 3.10.22. Result: **11 tests passed** (`Ra
 - Wallet and route scope denial when permissions are missing.
 - Successful synthetic wallet and route reads when the corresponding scope is present.
 
+The workflow also ran `docker compose --env-file env.transport.example -f transport_poc/docker-compose.transport.yaml config --quiet`; it completed successfully. This validates Compose configuration parsing, not image building or service startup.
+
 Workflow: `.github/workflows/sanad-auth-tests.yml`.
 
 ## Verification limits
 
 - Automated unit/regression tests passed in GitHub Actions.
-- No live Keycloak integration test, Docker Compose validation/build, Render deployment, browser WebAuthn test, or production security certification was performed.
+- Docker Compose configuration validation passed.
+- No Docker image build, live Keycloak integration test, Render deployment, browser WebAuthn test, or production security certification was performed.
 - Render issuer/realm configuration remains a deployment blocker; see `DEPLOYMENT_READINESS_2026-11-17.md`.
 
 ## Follow-up work
