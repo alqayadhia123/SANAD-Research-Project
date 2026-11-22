@@ -11,3 +11,4 @@ CMD ["gunicorn", "--bind", "0.0.0.0:10000", "app:app"]
 
 CMD ["gunicorn", 
 >>>>>>> 068d918 (Update driver_wallet_api Dockerfile)
+Update Dockerfile
