@@ -6,12 +6,13 @@ services:
     dockerfilePath: ./transport_poc/driver_wallet_api/Dockerfile
     dockerContext: ./transport_poc/driver_wallet_api
     envVars:
+      # Set this to the externally reachable HTTPS issuer for your Keycloak realm in Render.
       - key: KEYCLOAK_ISSUER
-        value: http://keycloak-transport:8080/realms/sanad-lab
+        sync: false
       - key: OIDC_CLIENT_ID
         value: driver-wallet-api
       - key: EXPECTED_AUDIENCE
         value: driver-wallet-api
       - key: REQUIRED_WALLET_SCOPE
         value: wallet:read
-      # ملاحظة: المتغيرات السرية (مثل OIDC_CLIENT_SECRET) يجب إدخالها من لوحة تحكم Render وليس هنا.
+      # Set OIDC_CLIENT_SECRET in the Render dashboard; never commit it.
