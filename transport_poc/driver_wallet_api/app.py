@@ -15,6 +15,7 @@ def create_app(test_config=None):
         OIDC_CLIENT_ID=os.getenv("OIDC_CLIENT_ID", "driver-wallet-api"),
         OIDC_CLIENT_SECRET=os.getenv("OIDC_CLIENT_SECRET", ""),
         EXPECTED_AUDIENCE=os.getenv("EXPECTED_AUDIENCE", "driver-wallet-api"),
+        REQUIRED_WALLET_SCOPE=os.getenv("REQUIRED_WALLET_SCOPE", "wallet:read"),
         HTTP_TIMEOUT_SECONDS=float(os.getenv("HTTP_TIMEOUT_SECONDS", "3")),
         MAX_CONTENT_LENGTH=16 * 1024,
     )
@@ -97,6 +98,10 @@ def create_app(test_config=None):
         token_data, failure = authorized_subject()
         if failure:
             return failure
+        granted_scopes = token_data.get("scope", "").split()
+        required_scope = app.config["REQUIRED_WALLET_SCOPE"]
+        if required_scope and required_scope not in granted_scopes:
+            return jsonify(error="required_scope_missing", required_scope=required_scope, access="denied"), 403
         return jsonify(
             status="success",
             driver=token_data.get("preferred_username", token_data.get("sub", "synthetic-driver")),
